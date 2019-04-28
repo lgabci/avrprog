@@ -12,3 +12,8 @@ avrprog.elf: avrprog.c
 .PHONY: prog
 prog: avrprog.elf
 	avrdude -p m8 -c ft232r -P ft0 -U flash:v:$<:e || avrdude -p m8 -c ft232r -P ft0 -U flash:w:$<:e
+
+
+.PHONY: test
+test: avrprog.elf
+	avrdude -p m8 -c stk500v2 -P /dev/ttyUSB0 -b 9600 -U signature:r:/dev/null:h
