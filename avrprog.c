@@ -1,10 +1,14 @@
-#define F_CPU 8000000UL
+#define F_CPU 7372800UL
 
 #include <avr/io.h>
 #include <util/delay.h>
 
-#define BAUD 9600
+#define BAUD 115200
+
 int main() {
+
+  DDRC |= ( 1 << PC5 );
+  PORTC |= ( 1 << PC5 );
 
   UBRRH = (F_CPU / 16 / BAUD - 1) >> 8;
   UBRRL = F_CPU / 16 / BAUD - 1;
@@ -17,6 +21,8 @@ int main() {
     while ( ! (UCSRA & (1 << RXC)))
       ;
     c = UDR;
+
+    PORTC ^= ( 1 << PC5 );
 
     while ( ! (UCSRA & (1 << UDRE)))
       ;

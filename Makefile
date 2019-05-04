@@ -16,4 +16,4 @@ prog: avrprog.elf
 
 .PHONY: test
 test: avrprog.elf
-	avrdude -p m8 -c stk500v2 -P /dev/ttyUSB0 -b 9600 -U signature:r:/dev/null:h
+	avrdude -p m8 -c stk500v2 -P /dev/ttyUSB0 -U signature:r:/dev/null:h
