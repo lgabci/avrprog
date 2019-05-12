@@ -29,3 +29,8 @@ clean:
 .PHONY: test
 test: avrprog.elf
 	avrdude -p m8 -c stk500v2 -P /dev/ttyUSB0 -U signature:r:/dev/null:h -vv
+
+.PHONY: test2
+test2:
+	avrdude -p m8 -B 9600 -c ft232r -P ft0 -U lfuse:r:/tmp/lfuse.txt:h -vv
+	cat /tmp/lfuse.txt

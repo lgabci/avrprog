@@ -10,12 +10,6 @@ unsigned char seq;              /* message sequence    */
 unsigned short int msgsize;     /* message size in msg */
 unsigned char msg[MAXMSGSIZE];  /* message body        */
 
-/* // --------------------------------------------------------- */
-#define MAXQ 200
-unsigned char q[MAXQ];
-unsigned char qc = 0;
-/* // --------------------------------------------------------- */
-
 /* PARAM_RESET_POLARITY
      0 = active high reset (AT89)
      1 = active low reset (AVR) */
@@ -42,7 +36,7 @@ void initEmClock(void) {
    TIMSK  -       -       TICIE1  OCIE1A  OCIE1B  TOIE1   -       -
    TIFR   -       -       ICF1    OCF1A   OCF1B   TOV1    -       -        */
 
-  DDRB |= _BV(PORTB1);
+  DDRB |= _BV(DDB1);
   TCCR1A = _BV(COM1A1) |              /* non-inverting mode    */
     _BV(WGM11);                       /* fast PWM, TOP = ICR1  */
   TCCR1B = _BV(WGM13) | _BV(WGM12) |  /* fast PWM, TOP = ICR1  */
@@ -78,21 +72,6 @@ unsigned char receive(unsigned char *c) {
     ;
   err = UCSRA & (_BV(FE) | _BV(DOR));
   *c = UDR;
-/* // ------------------------------------------------------------ */
-  if (qc < MAXQ) {
-    q[qc] = *c;
-    qc ++;
-  }
-  if (*c == 'q') {
-    unsigned char i;
-    unsigned char h[16] = "0123456789ABCDEF";
-    for(i = 0; i < qc; i ++) {
-      transmit(h[q[i] >> 4]);
-      transmit(h[q[i] & 0x0f]);
-      transmit(' ');
-    }
-  }
-/* // ------------------------------------------------------------ */
   return ! err;
 }
 
@@ -477,9 +456,45 @@ void sendMessage() {
   transmit(checksum);
 }
 
+void initSPI(void) {
+/*
+   SPCR   SPIE    SPE     DORD    MSTR    CPOL    CPHA    SPR1    SPR0
+   SPSR   SPIF    WCOL    -       -       -       -       -       SPI2X
+   SPDR   SPID7   SPID6   SPID5   SPID4   SPID3   SPID2   SPID1   SPID0   */
+  DDRB |=_BV(DDB3) | _BV(DDB5);
+  SPCR = _BV(SPE) | _BV(MSTR) | _BV(SPR1) | _BV(SPR0);
+}
+
+unsigned char transmitSPI(unsigned char c) {
+  SPDR = c;
+  while (! (SPSR & _BV(SPIF)))
+    ;
+  return SPDR;
+}
+
 int main() {
   initEmClock();
   initUSART();
+  initSPI();
+
+  /* // ------------------------------------------------- */
+  while(1) {
+    const unsigned char h[16] = "0123456789ABCDEF";
+    const unsigned char q[4] = { 0xAC, 0x53, 0, 0};
+    unsigned char i;
+    unsigned char c;
+
+    _delay_ms(50);
+    for (i = 0; i < 4; i ++) {
+      c = transmitSPI(q[i]);
+
+      transmit(h[c >> 4]);
+      transmit(h[c & 0x0f]);
+      transmit(' ');
+    }
+    _delay_ms(1000);
+  }
+  /* // ------------------------------------------------- */
 
   while (1) {
     readMessage();
