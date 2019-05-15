@@ -36,7 +36,7 @@ void initEmClock(void) {
    TIMSK  -       -       TICIE1  OCIE1A  OCIE1B  TOIE1   -       -
    TIFR   -       -       ICF1    OCF1A   OCF1B   TOV1    -       -        */
 
-  DDRB |= _BV(DDB1);
+  DDRB |= _BV(DDB1);                  /* set output pin        */
   TCCR1A = _BV(COM1A1) |              /* non-inverting mode    */
     _BV(WGM11);                       /* fast PWM, TOP = ICR1  */
   TCCR1B = _BV(WGM13) | _BV(WGM12) |  /* fast PWM, TOP = ICR1  */
@@ -152,7 +152,7 @@ void readMessage() {
     chksum ^= c;
 
     /* get data, readars even if it is too long */
-    for(i = 0; i < msgsize; i ++) {
+    for (i = 0; i < msgsize; i ++) {
       RECV(c)
       chksum ^= c;
 
@@ -448,7 +448,7 @@ void sendMessage() {
   transmit(TOKEN);
   checksum ^= TOKEN;
 
-  for(i = 0; i < msgsize; i ++) {
+  for (i = 0; i < msgsize; i ++) {
     transmit(msg[i]);
     checksum ^= msg[i];
   }
@@ -457,19 +457,43 @@ void sendMessage() {
 }
 
 void initSPI(void) {
-/*
-   SPCR   SPIE    SPE     DORD    MSTR    CPOL    CPHA    SPR1    SPR0
-   SPSR   SPIF    WCOL    -       -       -       -       -       SPI2X
-   SPDR   SPID7   SPID6   SPID5   SPID4   SPID3   SPID2   SPID1   SPID0   */
-  DDRB |=_BV(DDB3) | _BV(DDB5);
-  SPCR = _BV(SPE) | _BV(MSTR) | _BV(SPR1) | _BV(SPR0);
+/* PIN   SPI   I/O
+   PC5   SCK   O
+   PC4   MISO  I
+   PC3   MOSI  O
+   PC2   RESET O
+                                                                           */
+  #define DDRSPI DDRC
+  #define PORTSPI PORTC
+
+  #define SCK 5
+  #define MISO 4
+  #define MOSI 3
+  #define RESET 2
+  DDRSPI = (DDRSPI & ~_BV(MISO)) | _BV(SCK) | _BV(MOSI) | _BV(RESET);
+  /* MOSI, RESET, SCK low */
+  PORTSPI = PORTSPI & ~(_BV(MOSI) | _BV(MISO) | _BV(RESET) | _BV(SCK));
 }
 
-unsigned char transmitSPI(unsigned char c) {
-  SPDR = c;
-  while (! (SPSR & _BV(SPIF)))
-    ;
-  return SPDR;
+unsigned char transmitSPI(unsigned char transv) {
+  unsigned char i;
+  unsigned char recv;
+
+  recv = 0;
+  for (i = _BV(7); i; i >>= 1) {
+    if (transv & i) {
+      PORTSPI |= _BV(MOSI);
+    }
+    else {
+      PORTSPI &= ~_BV(MOSI);
+    }
+    _delay_us(5);
+    PORTSPI |= _BV(SCK);
+    _delay_ms(5);
+    PORTSPI &= ~_BV(SCK);
+    recv = recv << 1 | (PORTSPI >> MISO & 0x01);
+  }
+  return recv;
 }
 
 int main() {
@@ -478,22 +502,41 @@ int main() {
   initSPI();
 
   /* // ------------------------------------------------- */
+#if 1
+  {
+    unsigned char c;
+    do {
+      receive(&c);
+      transmit(c);
+    } while (c != 'q');
+  }
+  transmit(0x0d);
+  transmit(0x0a);
+
   while(1) {
     const unsigned char h[16] = "0123456789ABCDEF";
     const unsigned char q[4] = { 0xAC, 0x53, 0, 0};
     unsigned char i;
     unsigned char c;
 
-    _delay_ms(50);
+    PORTSPI |= _BV(RESET);
+    _delay_us(50);
+    PORTSPI &= ~_BV(RESET);
+
+    _delay_ms(25);
     for (i = 0; i < 4; i ++) {
       c = transmitSPI(q[i]);
 
+      transmit(h[q[i] >> 4]);
+      transmit(h[q[i] & 0x0f]);
+      transmit('-');
       transmit(h[c >> 4]);
       transmit(h[c & 0x0f]);
       transmit(' ');
     }
     _delay_ms(1000);
   }
+#endif
   /* // ------------------------------------------------- */
 
   while (1) {

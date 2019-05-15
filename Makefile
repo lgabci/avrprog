@@ -19,8 +19,8 @@ avrprog.hex: avrprog.elf
 .PHONY: prog
 prog: avrprog.hex
 	avrdude -p m8 -c ft232r -P ft0 -qq -U flash:v:$<:i || avrdude -p m8 -c ft232r -P ft0 -U flash:w:$<:i
-	avrdude -p m8 -c ft232r -P ft0 -qq -U hfuse:v:0xd9:m || avrdude -p m8 -c ft232r -P ft0 -U hfuse:w:0xd9:m
-	avrdude -p m8 -c ft232r -P ft0 -qq -U lfuse:v:0xff:m || avrdude -p m8 -c ft232r -P ft0 -U lfuse:w:0xff:m
+#	avrdude -p m8 -c ft232r -P ft0 -qq -U hfuse:v:0xd9:m || avrdude -p m8 -c ft232r -P ft0 -U hfuse:w:0xd9:m
+#	avrdude -p m8 -c ft232r -P ft0 -qq -U lfuse:v:0xff:m || avrdude -p m8 -c ft232r -P ft0 -U lfuse:w:0xff:m
 
 .PHONY: clean
 clean:
