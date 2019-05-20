@@ -1,85 +1,6 @@
-#define F_CPU 7372800UL
+/* AVR programmer message */
 
-#include <avr/io.h>
-#include <util/delay.h>
-
-#include "command.h"
-
-#define MAXMSGSIZE 100
-unsigned char seq;              /* message sequence    */
-unsigned short int msgsize;     /* message size in msg */
-unsigned char msg[MAXMSGSIZE];  /* message body        */
-
-/* PARAM_RESET_POLARITY
-     0 = active high reset (AT89)
-     1 = active low reset (AVR) */
-unsigned char paramResetPolarity = 1;
-/* PARAM_CONTROLLER_INIT
-     set 0 at reset, host can set it, and test if the power has been lost */
-unsigned char paramControllerInit = 0;
-
-unsigned char statusReg = STATUS_CMD_OK;
-
-
-void initEmClock(void) {
-/* emergency external clock signal
-   TCCR1A COM1A1  COM1A0  COM1B1  COM1B0  FOC1A   FOC1B   WGM11   WGM10
-   TCCR1B ICNC1   ICES1   -       WGM13   WGM12   CS12    CS11    CS10
-   TCNT1L TCNT1L7 TCNT1L6 TCNT1L5 TCNT1L4 TCNT1L3 TCNT1L2 TCNT1L1 TCNT1L0
-   TCNT1H TCNT1H7 TCNT1H6 TCNT1H5 TCNT1H4 TCNT1H3 TCNT1H2 TCNT1H1 TCNT1H0
-   OCR1AL ORC1AL7 ORC1AL6 ORC1AL5 ORC1AL4 ORC1AL3 ORC1AL2 ORC1AL1 ORC1AL0
-   OCR1AH ORC1AH7 ORC1AH6 ORC1AH5 ORC1AH4 ORC1AH3 ORC1AH2 ORC1AH1 ORC1AH0
-   OCR1BL ORC1BL7 ORC1BL6 ORC1BL5 ORC1BL4 ORC1BL3 ORC1BL2 ORC1BL1 ORC1BL0
-   OCR1BH ORC1BH7 ORC1BH6 ORC1BH5 ORC1BH4 ORC1BH3 ORC1BH2 ORC1BH1 ORC1BH0
-   ICR1L  IRC1L7  IRC1L6  IRC1L5  IRC1L4  IRC1L3  IRC1L2  IRC1L1  IRC1L0
-   ICR1H  IRC1H7  IRC1H6  IRC1H5  IRC1H4  IRC1H3  IRC1H2  IRC1H1  IRC1H0
-   TIMSK  -       -       TICIE1  OCIE1A  OCIE1B  TOIE1   -       -
-   TIFR   -       -       ICF1    OCF1A   OCF1B   TOV1    -       -        */
-
-  DDRB |= _BV(DDB1);                  /* set output pin        */
-  TCCR1A = _BV(COM1A1) |              /* non-inverting mode    */
-    _BV(WGM11);                       /* fast PWM, TOP = ICR1  */
-  TCCR1B = _BV(WGM13) | _BV(WGM12) |  /* fast PWM, TOP = ICR1  */
-    _BV(CS10);                        /* prescaler = 1         */
-  ICR1 = 7;                           /* TOP = 7, 0 - 7        */
-  OCR1A = 3;                     /* set = 0 - 3, clear = 4 - 7 */
-}
-
-void initUSART(void) {
-/* The STK500 uses: 115.2 kbps, 8 data bits, 1 stop bit, no parity
-   UDR    ----------------------- UART data --------------------------
-   UCSRA  RXC     TXC     UDRE    FE      DOR     PE      U2X     MPCM
-   UCSRB  RXCIE   TXCIE   UDRIE   RXEN    TXEN    UCSZ2   RXB8    TXB8
-   UCSRC  URSEL   UMSEL   UPM1    UPM0    USBS    UCSZ1   UCSZ0   UCPOL
-   UBRRH  URSEL   -       -       -       UBRR3   UBRR2   UBRR1   UBRR0
-   UBRRL  UBBR7   UBBR6   UBBR5   UBBR4   UBBR3   UBBR2   UBBR1   UBBR0   */
-
-#define BAUD 115200
-  UBRRH = (F_CPU / 16 / BAUD - 1) >> 8;
-  UBRRL = F_CPU / 16 / BAUD - 1;
-#undef BAUD
-  UCSRA = 0;
-  UCSRC = _BV(URSEL) | _BV(UCSZ1) | _BV(UCSZ0);
-  UCSRB = _BV(RXEN) | _BV(TXEN);
-}
-
-void transmit(unsigned char c) ;   /* // ----------------------- */
-/* Receive a character from USART, returns error */
-unsigned char receive(unsigned char *c) {
-  unsigned char err;
-
-  while (! (UCSRA & _BV(RXC)))
-    ;
-  err = UCSRA & (_BV(FE) | _BV(DOR));
-  *c = UDR;
-  return ! err;
-}
-
-/* Send a character on USART */
-void transmit(unsigned char c) {
-  while (! (UCSRA & _BV(UDRE)));
-  UDR = c;
-}
+#include "message.h"
 
 /* reads a message */
 void readMessage() {
@@ -173,6 +94,43 @@ void readMessage() {
     break;
   }
 #undef RECV
+}
+
+/* send message */
+void sendMessage() {
+  unsigned char checksum;
+  unsigned short int i;
+
+/* parameter        size  description
+   MSG_START           1  always 0x1B
+   SEQ_NUMBER          1  incremented for each message, wraps after 0xFF
+   MSG_SIZE            2  MSB first, size of message body
+   TOKEN               1  always 0x0E
+   MSG_BODY     MSG_SIZE  message body, from 0 to 65535 bytes
+   CHECKSUM            1  XOR all bytes in message                         */
+
+  checksum = 0;
+  transmit(MESSAGE_START);
+  checksum ^= MESSAGE_START;
+
+  transmit(seq);
+  checksum ^= seq;
+
+  transmit(msgsize >> 8);
+  checksum ^= msgsize >> 8;
+
+  transmit(msgsize & 0xff);
+  checksum ^= msgsize & 0xff;
+
+  transmit(TOKEN);
+  checksum ^= TOKEN;
+
+  for (i = 0; i < msgsize; i ++) {
+    transmit(msg[i]);
+    checksum ^= msg[i];
+  }
+
+  transmit(checksum);
 }
 
 /* process message */
@@ -382,21 +340,22 @@ void processMessage() {
       if (msgsize == 5) {
         msgsize = 2;     /* // */
         msg[1] = STATUS_CMD_OK;
-        statusReg = STATUS_CMD_FAILED;
+        statusReg = msg[1];
 	return;
       }
     case CMD_FIRMWARE_UPGRADE:     /* ------------------------------------ */
       if (msgsize == 11) {
         msgsize = 2;     /* // */
-        msg[1] = STATUS_CMD_OK;
+        msg[1] = STATUS_CMD_FAILED;
         statusReg = STATUS_CMD_FAILED;
 	return;
       }
     case CMD_ENTER_PROGMODE_ISP:   /* ------------------------------------ */
       if (msgsize == 12) {
         msgsize = 2;     /* // */
-        msg[1] = STATUS_CMD_OK;
-        statusReg = STATUS_CMD_OK;
+        msg[1] = enterProgMode(msg[1], msg[2], msg[3], msg[4], msg[5],
+          msg[6], msg[7], msg[8], msg[9], msg[10], msg[11]);
+        statusReg = msg[1];
 	return;
       }
       break;
@@ -404,7 +363,7 @@ void processMessage() {
       if (msgsize == 3) {
         msgsize = 2;
         msg[1] = STATUS_CMD_OK;
-        statusReg = STATUS_CMD_OK;
+        statusReg = msg[1];
 	return;
       }
       break;
@@ -417,131 +376,4 @@ void processMessage() {
   msgsize = 2;                      /* error on unknown command */
   msg[1] = STATUS_CMD_FAILED;
   statusReg = STATUS_CMD_FAILED;
-}
-
-/* send message */
-void sendMessage() {
-  unsigned char checksum;
-  unsigned short int i;
-
-/* parameter        size  description
-   MSG_START           1  always 0x1B
-   SEQ_NUMBER          1  incremented for each message, wraps after 0xFF
-   MSG_SIZE            2  MSB first, size of message body
-   TOKEN               1  always 0x0E
-   MSG_BODY     MSG_SIZE  message body, from 0 to 65535 bytes
-   CHECKSUM            1  XOR all bytes in message                         */
-
-  checksum = 0;
-  transmit(MESSAGE_START);
-  checksum ^= MESSAGE_START;
-
-  transmit(seq);
-  checksum ^= seq;
-
-  transmit(msgsize >> 8);
-  checksum ^= msgsize >> 8;
-
-  transmit(msgsize & 0xff);
-  checksum ^= msgsize & 0xff;
-
-  transmit(TOKEN);
-  checksum ^= TOKEN;
-
-  for (i = 0; i < msgsize; i ++) {
-    transmit(msg[i]);
-    checksum ^= msg[i];
-  }
-
-  transmit(checksum);
-}
-
-void initSPI(void) {
-/* PIN   SPI   I/O
-   PC5   SCK   O
-   PC4   MISO  I
-   PC3   MOSI  O
-   PC2   RESET O
-                                                                           */
-  #define DDRSPI DDRC
-  #define PORTSPI PORTC
-
-  #define SCK 5
-  #define MISO 4
-  #define MOSI 3
-  #define RESET 2
-  DDRSPI = (DDRSPI & ~_BV(MISO)) | _BV(SCK) | _BV(MOSI) | _BV(RESET);
-  /* MOSI, RESET, SCK low */
-  PORTSPI = PORTSPI & ~(_BV(MOSI) | _BV(MISO) | _BV(RESET) | _BV(SCK));
-}
-
-unsigned char transmitSPI(unsigned char transv) {
-  unsigned char i;
-  unsigned char recv;
-
-  recv = 0;
-  for (i = _BV(7); i; i >>= 1) {
-    if (transv & i) {
-      PORTSPI |= _BV(MOSI);
-    }
-    else {
-      PORTSPI &= ~_BV(MOSI);
-    }
-    _delay_us(5);
-    PORTSPI |= _BV(SCK);
-    _delay_ms(5);
-    PORTSPI &= ~_BV(SCK);
-    recv = recv << 1 | (PORTSPI >> MISO & 0x01);
-  }
-  return recv;
-}
-
-int main() {
-  initEmClock();
-  initUSART();
-  initSPI();
-
-  /* // ------------------------------------------------- */
-#if 1
-  {
-    unsigned char c;
-    do {
-      receive(&c);
-      transmit(c);
-    } while (c != 'q');
-  }
-  transmit(0x0d);
-  transmit(0x0a);
-
-  while(1) {
-    const unsigned char h[16] = "0123456789ABCDEF";
-    const unsigned char q[4] = { 0xAC, 0x53, 0, 0};
-    unsigned char i;
-    unsigned char c;
-
-    PORTSPI |= _BV(RESET);
-    _delay_us(50);
-    PORTSPI &= ~_BV(RESET);
-
-    _delay_ms(25);
-    for (i = 0; i < 4; i ++) {
-      c = transmitSPI(q[i]);
-
-      transmit(h[q[i] >> 4]);
-      transmit(h[q[i] & 0x0f]);
-      transmit('-');
-      transmit(h[c >> 4]);
-      transmit(h[c & 0x0f]);
-      transmit(' ');
-    }
-    _delay_ms(1000);
-  }
-#endif
-  /* // ------------------------------------------------- */
-
-  while (1) {
-    readMessage();
-    processMessage();
-    sendMessage();
-  }
 }

@@ -26,8 +26,12 @@ prog: avrprog.hex
 clean:
 	rm -f avrprog.elf avrprog.hex
 
+.PHONY: test0
+test0:
+	screen /dev/ttyUSB0 115200
+
 .PHONY: test
-test: avrprog.elf
+test:
 	avrdude -p m8 -c stk500v2 -P /dev/ttyUSB0 -U signature:r:/dev/null:h -vv
 
 .PHONY: test2
