@@ -7,14 +7,21 @@ CFLAGS := -mmcu=atmega8a -O2 -pedantic -Wall -Werror
 OBJCOPY := avr-objcopy
 OBJCOPYFLAGS := -j .text -j .data -O ihex
 
+OBJS := avrprog.o message.o misc.o prog.o serial.o spi.o
+
 all: prog
 
-avrprog.elf: avrprog.c command.h
-	$(CC) $(CFLAGS) -O2 -o $@ $<
+%.o: %.c
+	$(CC) $(CFLAGS) -c -MMD -MF $(@:.o=.d) -MP -o $@ $<
+
+avrprog.elf: $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
 	@chmod -x $@
 
 avrprog.hex: avrprog.elf
 	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+
+-include $(OBJS:.o=.d)
 
 .PHONY: prog
 prog: avrprog.hex
@@ -24,7 +31,7 @@ prog: avrprog.hex
 
 .PHONY: clean
 clean:
-	rm -f avrprog.elf avrprog.hex
+	rm -f avrprog.elf avrprog.hex $(OBJS) $(OBJS:.o=.d)
 
 .PHONY: test0
 test0:

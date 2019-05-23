@@ -1,2 +1,14 @@
-avrprog.elf
-avrprog.hex
+src/avrprog.elf
+src/avrprog.hex
+src/avrprog.o
+src/message.o
+src/misc.o
+src/prog.o
+src/serial.o
+src/spi.o
+src/avrprog.d
+src/message.d
+src/misc.d
+src/prog.d
+src/serial.d
+src/spi.d

@@ -1,5 +1,7 @@
 /* AVR programmer misc */
 
+#include <avr/io.h>
+
 #include "misc.h"
 
 void initEmClock(void) {

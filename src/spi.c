@@ -1,5 +1,10 @@
 /* AVR programmer SPI */
 
+#include "f_cpu.h"
+
+#include <avr/io.h>
+#include <util/delay.h>
+
 #include "spi.h"
 
 void initSPI(void) {

@@ -1,5 +1,9 @@
 /* AVR programmer serial */
 
+#include "f_cpu.h"
+
+#include <avr/io.h>
+
 #include "serial.h"
 
 void initUSART(void) {

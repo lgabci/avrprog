@@ -1,6 +1,24 @@
 /* AVR programmer message */
 
 #include "message.h"
+#include "serial.h"
+#include "prog.h"
+#include "command.h"
+
+#define MAXMSGSIZE 100
+unsigned char seq;              /* message sequence    */
+unsigned short int msgsize;     /* message size in msg */
+unsigned char msg[MAXMSGSIZE];  /* message body        */
+
+/* PARAM_RESET_POLARITY
+     0 = active high reset (AT89)
+     1 = active low reset (AVR) */
+unsigned char paramResetPolarity = 1;
+/* PARAM_CONTROLLER_INIT
+     set 0 at reset, host can set it, and test if the power has been lost */
+unsigned char paramControllerInit = 0;
+
+unsigned char statusReg = STATUS_CMD_OK;
 
 /* reads a message */
 void readMessage() {
