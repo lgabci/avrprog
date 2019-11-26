@@ -1,6 +1,6 @@
 /* AVR programmer serial */
 
-#include "f_cpu.h"
+#include "common.h"
 
 #include <avr/io.h>
 

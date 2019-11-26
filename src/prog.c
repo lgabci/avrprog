@@ -1,5 +1,7 @@
 /* AVR programmer prog */
 
+#include "common.h"
+
 #include "prog.h"
 
 unsigned char enterProgMode(unsigned char timeout, unsigned char stabDelay,

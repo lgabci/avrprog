@@ -1,18 +1,20 @@
 /* AVR programmer */
 
-#include "f_cpu.h"
+#include "common.h"
 
 #include <avr/io.h>
 #include <util/delay.h>
 
-#include "avrprog.h"
+#include "main.h"
 #include "message.h"
 #include "misc.h"
 #include "prog.h"
 #include "serial.h"
 #include "spi.h"
+#include "hd44780.h"
 
 int main() {
+  initLcd();
   initEmClock();
   initUSART();
   initSPI();

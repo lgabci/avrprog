@@ -1,5 +1,7 @@
 /* AVR programmer message */
 
+#include "common.h"
+
 #include "message.h"
 #include "serial.h"
 #include "prog.h"
@@ -90,7 +92,7 @@ void readMessage() {
     }
     chksum ^= c;
 
-    /* get data, readars even if it is too long */
+    /* get data, read even if it is too long */
     for (i = 0; i < msgsize; i ++) {
       RECV(c)
       chksum ^= c;

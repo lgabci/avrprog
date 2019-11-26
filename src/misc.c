@@ -1,5 +1,7 @@
 /* AVR programmer misc */
 
+#include "common.h"
+
 #include <avr/io.h>
 
 #include "misc.h"
