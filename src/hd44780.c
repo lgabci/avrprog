@@ -59,6 +59,9 @@
 #define tDSW  0.80
 #define tH    0.10
 
+void sendNibble(const unsigned char rs, const  unsigned char n);
+void sendByte(const unsigned char rs, const unsigned char n);
+
 void initLcd(void) {
   DDRC = 0x3f;					/* PC0-PC5 output */
 
@@ -82,8 +85,6 @@ void initLcd(void) {
 
   sendByte(0, CMDDONOFF | _BV(BITD) | _BV(BITC) | _BV(BITB)); /* display on */
   DELAYDONOFF;
-
-  writeStr("alma körte");  //
 }
 
 void writeChr(const char c) {

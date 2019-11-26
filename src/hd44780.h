@@ -7,7 +7,5 @@ void initLcd(void);
 void writeChr(const char c);
 void writeStr(const char *c);
 void setPos(const unsigned char col, const unsigned char row);
-void sendNibble(const unsigned char rs, const  unsigned char n);
-void sendByte(const unsigned char rs, const unsigned char n);
 
 #endif
