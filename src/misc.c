@@ -1,12 +1,10 @@
 /* AVR programmer misc */
 
-#include "common.h"
-
-#include <avr/io.h>
-
 #include "misc.h"
+#include <util/delay.h>
 
-void initEmClock(void) {
+/* Initalize emergecy clock (for MCU to program)              */
+void emClockInit(void) {
 /* emergency external clock signal
    TCCR1A COM1A1  COM1A0  COM1B1  COM1B0  FOC1A   FOC1B   WGM11   WGM10
    TCCR1B ICNC1   ICES1   -       WGM13   WGM12   CS12    CS11    CS10
@@ -28,4 +26,29 @@ void initEmClock(void) {
     _BV(CS10);                        /* prescaler = 1         */
   ICR1 = 7;                           /* TOP = 7, 0 - 7        */
   OCR1A = 3;                     /* set = 0 - 3, clear = 4 - 7 */
+}
+
+/* string to hexadecimal converter
+   -v: value to convert
+   - str: pointer to strig where to put hexa string            */
+void hex(const uint8_t v, int8_t *str) {
+  str[0] = v >> 4 < 10 ? '0' + (v >> 4) : 'A' - 10 + (v >> 4);
+  str[1] = (v & 0x0f) < 10 ? '0' + (v & 0x0f) : 'A' - 10 + (v & 0x0f);
+  str[2] = 0;
+}
+
+/* wait ms
+   -w: milliseconds to wait                    */
+void delayMs(uint8_t w) {
+  while (w --) {
+    _delay_ms(1);
+  }
+}
+
+/* wait us
+   -w: microseconds to wait                    */
+void delayUs(uint8_t w) {
+  while (w --) {
+    _delay_us(1);
+  }
 }

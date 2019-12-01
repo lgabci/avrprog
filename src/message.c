@@ -1,32 +1,32 @@
 /* AVR programmer message */
 
-#include "common.h"
-
+#include "misc.h"
 #include "message.h"
 #include "serial.h"
 #include "prog.h"
 #include "command.h"
+#include "lcd.h"  /////
 
 #define MAXMSGSIZE 100
-unsigned char seq;              /* message sequence    */
-unsigned short int msgsize;     /* message size in msg */
-unsigned char msg[MAXMSGSIZE];  /* message body        */
+uint8_t seq;              /* message sequence    */
+uint16_t msgSize;         /* message size in msg */
+uint8_t msg[MAXMSGSIZE];  /* message body        */
 
 /* PARAM_RESET_POLARITY
      0 = active high reset (AT89)
      1 = active low reset (AVR) */
-unsigned char paramResetPolarity = 1;
+uint8_t paramResetPolarity = 1;
 /* PARAM_CONTROLLER_INIT
      set 0 at reset, host can set it, and test if the power has been lost */
-unsigned char paramControllerInit = 0;
+uint8_t paramControllerInit = 0;
 
-unsigned char statusReg = STATUS_CMD_OK;
+uint8_t statusReg;
 
 /* reads a message */
 void readMessage() {
-  unsigned char c;
-  unsigned char chksum;
-  unsigned short int i;
+  uint8_t c;
+  uint8_t chksum;
+  uint16_t i;
 
 /* parameter        size  description
    MSG_START           1  always 0x1B
@@ -57,69 +57,77 @@ void readMessage() {
    get checksum     read char  checksum OK
                     read char  checksum NOT OK           start             */
 
-#define RECV(c) \
-    if (! receive(&(c))) { \
-      continue; \
-    }
-
   while (1) {
     /* start */
     chksum = 0;
-    RECV(c)
+    if (! usartReceive(&c)) {
+      continue;
+    }
     if (c != MESSAGE_START) {
       continue;
     }
     chksum ^= c;
 
     /* get seq */
-    RECV(seq)
+    if (! usartReceive(&seq)) {
+      continue;
+    }
     chksum ^= seq;
 
     /* get msg size 1 */
-    RECV(c)
+    if (! usartReceive(&c)) {
+      continue;
+    }
     chksum ^= c;
-    msgsize = (unsigned short int)c << 8;
+    msgSize = (uint16_t)c << 8;
 
     /* get msg size 2 */
-    RECV(c)
+    if (! usartReceive(&c)) {
+      continue;
+    }
     chksum ^= c;
-    msgsize += c;
+    msgSize |= c;
 
     /* get token */
-    RECV(c)
+    if (! usartReceive(&c)) {
+      continue;
+    }
     if (c != TOKEN) {
       continue;
     }
     chksum ^= c;
 
     /* get data, read even if it is too long */
-    for (i = 0; i < msgsize; i ++) {
-      RECV(c)
+    for (i = 0; i < msgSize; i ++) {
+      if (! usartReceive(&c)) {
+        continue;
+      }
       chksum ^= c;
 
-      if (msgsize <= MAXMSGSIZE) {  /* store message if it is not too long */
+      if (msgSize <= MAXMSGSIZE) {  /* store message if it is not too long */
         msg[i] = c;
       }
     }
 
     /* get checksum */
-    RECV(c)
+    if (! usartReceive(&c)) {
+      continue;
+    }
     if (c != chksum) {
       continue;
     }
-    if (msgsize > MAXMSGSIZE) {
+    if (msgSize > MAXMSGSIZE) {
       msg[i] = c;
     }
 
     break;
   }
-#undef RECV
 }
 
 /* send message */
 void sendMessage() {
-  unsigned char checksum;
-  unsigned short int i;
+  uint8_t checksum;
+  uint16_t i;
 
 /* parameter        size  description
    MSG_START           1  always 0x1B
@@ -130,270 +138,317 @@ void sendMessage() {
    CHECKSUM            1  XOR all bytes in message                         */
 
   checksum = 0;
-  transmit(MESSAGE_START);
+  usartTransmit(MESSAGE_START);
   checksum ^= MESSAGE_START;
 
-  transmit(seq);
+  usartTransmit(seq);
   checksum ^= seq;
 
-  transmit(msgsize >> 8);
-  checksum ^= msgsize >> 8;
+  usartTransmit(msgSize >> 8);
+  checksum ^= msgSize >> 8;
 
-  transmit(msgsize & 0xff);
-  checksum ^= msgsize & 0xff;
+  usartTransmit(msgSize & 0xff);
+  checksum ^= msgSize & 0xff;
 
-  transmit(TOKEN);
+  usartTransmit(TOKEN);
   checksum ^= TOKEN;
 
-  for (i = 0; i < msgsize; i ++) {
-    transmit(msg[i]);
+  for (i = 0; i < msgSize; i ++) {
+    usartTransmit(msg[i]);
     checksum ^= msg[i];
   }
 
-  transmit(checksum);
+  usartTransmit(checksum);
 }
 
 /* process message */
 void processMessage() {
   switch(msg[0]) {
     case CMD_SIGN_ON:               /* ----------------------------------- */
-      if (msgsize == 1) {
-        msgsize = 11;
+      if (msgSize == 1) {
+        msgSize = 11;
         msg[1] = STATUS_CMD_OK;     /* message status */
-	msg[2] = 8;                 /* length of signature string */
-	msg[3] = 'S';
-	msg[4] = 'T';
-	msg[5] = 'K';
-	msg[6] = '5';
-	msg[7] = '0';
-	msg[8] = '0';
-	msg[9] = '_';
-	msg[10] = '2';
+        msg[2] = 8;                 /* length of signature string */
+        msg[3] = 'S';
+        msg[4] = 'T';
+        msg[5] = 'K';
+        msg[6] = '5';
+        msg[7] = '0';
+        msg[8] = '0';
+        msg[9] = '_';
+        msg[10] = '2';
         statusReg = STATUS_CMD_OK;
-	return;
+        return;
       }
       break;
     case CMD_SET_PARAMETER:         /* ----------------------------------- */
-      if (msgsize == 3) {
+      if (msgSize == 3) {
         switch (msg[1]) {
-	  case PARAM_VTARGET:
-            msgsize = 2;
-	    if (msg[2] == 50) {         /* only 5.0 volts */
+          case PARAM_VTARGET:
+            msgSize = 2;
+            if (msg[2] == 50) {         /* only 5.0 volts */
               msg[1] = STATUS_CMD_OK;
               statusReg = STATUS_CMD_OK;
-	      return;
-	    }
-	    else {
+              return;
+            }
+            else {
               msg[1] = STATUS_CMD_FAILED;
               statusReg = STATUS_CMD_FAILED;
-	      return;
-	    }
+              return;
+            }
             break;
           case PARAM_VADJUST:
-            msgsize = 2;
-	    if (msg[2] == 50) {         /* only 5.0 volts */
+            msgSize = 2;
+            if (msg[2] == 50) {         /* only 5.0 volts */
               msg[1] = STATUS_CMD_OK;
               statusReg = STATUS_CMD_OK;
-	      return;
-	    }
-	    else {
+              return;
+            }
+            else {
               msg[1] = STATUS_CMD_FAILED;
               statusReg = STATUS_CMD_FAILED;
-	      return;
-	    }
+              return;
+            }
             break;
           case PARAM_OSC_PSCALE:
-            msgsize = 2;
+            msgSize = 2;
             msg[1] = STATUS_CMD_FAILED;     /* // */
             statusReg = STATUS_CMD_FAILED;
-	    return;
+            return;
             break;
           case PARAM_OSC_CMATCH:
-            msgsize = 2;
+            msgSize = 2;
             msg[1] = STATUS_CMD_FAILED;     /* // */
             statusReg = STATUS_CMD_FAILED;
-	    return;
+            return;
             break;
           case PARAM_SCK_DURATION:
-            msgsize = 2;
+            msgSize = 2;
             msg[1] = STATUS_CMD_FAILED;     /* // */
             statusReg = STATUS_CMD_FAILED;
-	    return;
+            return;
             break;
           case PARAM_RESET_POLARITY:
             paramResetPolarity = msg[2];
-            msgsize = 2;
+            msgSize = 2;
             msg[1] = STATUS_CMD_OK;
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
           case PARAM_CONTROLLER_INIT:
             paramControllerInit = msg[2];
-            msgsize = 2;
+            msgSize = 2;
             msg[1] = STATUS_CMD_OK;
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
-	}
+        }
       }
       break;
     case CMD_GET_PARAMETER:         /* ----------------------------------- */
-      if (msgsize == 2) {
+      if (msgSize == 2) {
         switch (msg[1]) {
           case PARAM_BUILD_NUMBER_LOW:
-            msgsize = 3;
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
             msg[2] = 0;                 /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
           case PARAM_BUILD_NUMBER_HIGH:
-	    msgsize = 3;
-	    msg[1] = STATUS_CMD_OK;     /* message status */
-	    msg[2] = 1;                 /* parameter value */
-	    statusReg = STATUS_CMD_OK;
-	    return;
-	    break;
-	  case PARAM_HW_VER:
-	    msgsize = 3;
-	    msg[1] = STATUS_CMD_OK;     /* message status */
-	    msg[2] = 1;                 /* parameter value */
-	    statusReg = STATUS_CMD_OK;
-	    return;
-	    break;
-	  case PARAM_SW_MAJOR:
-	    msgsize = 3;
-	    msg[1] = STATUS_CMD_OK;     /* message status */
-	    msg[2] = 0;                 /* parameter value */
-	    statusReg = STATUS_CMD_OK;
-	    return;
-	    break;
-	  case PARAM_SW_MINOR:
-	    msgsize = 3;
-	    msg[1] = STATUS_CMD_OK;     /* message status */
-	    msg[2] = 1;                 /* parameter value */
-	    statusReg = STATUS_CMD_OK;
-	    return;
-	    break;
-	  case PARAM_VTARGET:
-            msgsize = 3;
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
-            msg[2] = 50;                /* parameter value */
+            msg[2] = 1;                 /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
-          case PARAM_VADJUST:
-            msgsize = 3;
+          case PARAM_HW_VER:
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
-            msg[2] = 50;                /* parameter value */
+            msg[2] = 1;                 /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
-          case PARAM_OSC_PSCALE:
-            msgsize = 3;
-            msg[1] = STATUS_CMD_OK;     /* message status */
-            msg[2] = 1;    /* // */     /* parameter value */
-            statusReg = STATUS_CMD_OK;
-	    return;
-            break;
-          case PARAM_OSC_CMATCH:
-            msgsize = 3;
-            msg[1] = STATUS_CMD_OK;     /* message status */
-            msg[2] = 1;    /* // */     /* parameter value */
-            statusReg = STATUS_CMD_OK;
-	    return;
-            break;
-          case PARAM_SCK_DURATION:
-            msgsize = 3;
-            msg[1] = STATUS_CMD_OK;     /* message status */
-            msg[2] = 1;    /* // */     /* parameter value */
-            statusReg = STATUS_CMD_OK;
-	    return;
-            break;
-          case PARAM_TOPCARD_DETECT:
-            msgsize = 3;
+          case PARAM_SW_MAJOR:
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
             msg[2] = 0;                 /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
+            break;
+          case PARAM_SW_MINOR:
+            msgSize = 3;
+            msg[1] = STATUS_CMD_OK;     /* message status */
+            msg[2] = 1;                 /* parameter value */
+            statusReg = STATUS_CMD_OK;
+            return;
+            break;
+          case PARAM_VTARGET:
+            msgSize = 3;
+            msg[1] = STATUS_CMD_OK;     /* message status */
+            msg[2] = 50;                /* parameter value */
+            statusReg = STATUS_CMD_OK;
+            return;
+            break;
+          case PARAM_VADJUST:
+            msgSize = 3;
+            msg[1] = STATUS_CMD_OK;     /* message status */
+            msg[2] = 50;                /* parameter value */
+            statusReg = STATUS_CMD_OK;
+            return;
+            break;
+          case PARAM_OSC_PSCALE:
+            msgSize = 3;
+            msg[1] = STATUS_CMD_OK;     /* message status */
+            msg[2] = 1;    /* // */     /* parameter value */
+            statusReg = STATUS_CMD_OK;
+            return;
+            break;
+          case PARAM_OSC_CMATCH:
+            msgSize = 3;
+            msg[1] = STATUS_CMD_OK;     /* message status */
+            msg[2] = 1;    /* // */     /* parameter value */
+            statusReg = STATUS_CMD_OK;
+            return;
+            break;
+          case PARAM_SCK_DURATION:
+            msgSize = 3;
+            msg[1] = STATUS_CMD_OK;     /* message status */
+            msg[2] = 1;    /* // */     /* parameter value */
+            statusReg = STATUS_CMD_OK;
+            return;
+            break;
+          case PARAM_TOPCARD_DETECT:
+            msgSize = 3;
+            msg[1] = STATUS_CMD_OK;     /* message status */
+            msg[2] = 0;                 /* parameter value */
+            statusReg = STATUS_CMD_OK;
+            return;
             break;
           case PARAM_STATUS:
-            msgsize = 3;
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
             msg[2] = statusReg;         /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
           case PARAM_DATA:
-            msgsize = 3;
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
             msg[2] = 0;                 /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
           case PARAM_RESET_POLARITY:
-            msgsize = 3;
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
             msg[2] = paramResetPolarity;  /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
           case PARAM_CONTROLLER_INIT:
-            msgsize = 3;
+            msgSize = 3;
             msg[1] = STATUS_CMD_OK;     /* message status */
             msg[2] = paramControllerInit;  /* parameter value */
             statusReg = STATUS_CMD_OK;
-	    return;
+            return;
             break;
         }
       }
       break;
     case CMD_OSCCAL:               /* ------------------------------------ */
-      if (msgsize == 1) {
-        msgsize = 2;     /* // */
+      if (msgSize == 1) {
+        msgSize = 2;     /* // */
         msg[1] = STATUS_CMD_OK;
         statusReg = STATUS_CMD_FAILED;
-	return;
+        return;
       }
       break;
     case CMD_LOAD_ADDRESS:         /* ------------------------------------ */
-      if (msgsize == 5) {
-        msgsize = 2;     /* // */
-        msg[1] = STATUS_CMD_OK;
+      if (msgSize == 5) {
+        msgSize = 2;     /* // */
+        msg[1] = loadAddress(&msg[1]);
         statusReg = msg[1];
-	return;
+        return;
       }
     case CMD_FIRMWARE_UPGRADE:     /* ------------------------------------ */
-      if (msgsize == 11) {
-        msgsize = 2;     /* // */
+      if (msgSize == 11) {
+        msgSize = 2;     /* // */
         msg[1] = STATUS_CMD_FAILED;
         statusReg = STATUS_CMD_FAILED;
-	return;
+        return;
       }
     case CMD_ENTER_PROGMODE_ISP:   /* ------------------------------------ */
-      if (msgsize == 12) {
-        msgsize = 2;     /* // */
-        msg[1] = enterProgMode(msg[1], msg[2], msg[3], msg[4], msg[5],
-          msg[6], msg[7], msg[8], msg[9], msg[10], msg[11]);
+      if (msgSize == 12) {
+        msgSize = 2;     /* // */
+        msg[1] = enterProgModeIsp(msg[1], msg[2], msg[3], msg[4], msg[5],
+          msg[6], msg[7], &msg[8]);
         statusReg = msg[1];
-	return;
+        return;
       }
       break;
     case CMD_LEAVE_PROGMODE_ISP:   /* ------------------------------------ */
-      if (msgsize == 3) {
-        msgsize = 2;
+      if (msgSize == 3) {
+        msgSize = 2;               /* // */
         msg[1] = STATUS_CMD_OK;
         statusReg = msg[1];
-	return;
+        return;
+      }
+      break;
+    case CMD_CHIP_ERASE_ISP:       /* ------------------------------------ */
+      if (msgSize == 7) {
+        msgSize = 2;               /* // */
+        msg[1] = STATUS_CMD_OK;
+        statusReg = msg[1];
+        return;
+      }
+      break;
+    case CMD_PROGRAM_FLASH_ISP:    /* ------------------------------------ */
+      if (msgSize >= 10) {
+        uint16_t numOfBytes;
+
+        numOfBytes = (uint16_t)msg[1] << 8 | msg[2];
+        if (msgSize == numOfBytes + 10) {
+          msgSize = 2;               /* // */
+          msg[1] = STATUS_CMD_OK;
+          statusReg = msg[1];
+          return;
+        }
       }
       break;
 
 
-    default:
+    case CMD_READ_FLASH_ISP:       /* ------------------------------------ */
+      if (msgSize == 4) {
+        uint16_t blockSize;
+
+        blockSize = (uint16_t)msg[1] << 8 | msg[2];
+        msg[1] = readFlashIsp(blockSize, msg[3], &msg[2]);
+        if (msg[1] == STATUS_CMD_OK) {
+          msgSize = blockSize + 3;
+          msg[blockSize + 2] = msg[1];
+        }
+        statusReg = msg[1];
+        return;
+      }
+      break;
+
+    case CMD_READ_FUSE_ISP:        /* ------------------------------------ */
+    case CMD_READ_SIGNATURE_ISP:   /* ------------------------------------ */
+      if (msgSize == 6) {
+        msgSize = 4;
+        msg[1] = readFuseIsp(msg[1], &msg[2], &msg[2]);
+        statusReg = msg[1];
+        msg[3] = msg[1];
+        return;
+      }
       break;
   }
 
-  msgsize = 2;                      /* error on unknown command */
+  lcdWriteHex(msg[0]);  ///
+  // lcdWriteChr(' ');     ///
+  msgSize = 2;                    /* unknown command or bad message */
   msg[1] = STATUS_CMD_FAILED;
-  statusReg = STATUS_CMD_FAILED;
+  statusReg = msg[1];
+  return;
 }

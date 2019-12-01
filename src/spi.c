@@ -1,35 +1,57 @@
 /* AVR programmer SPI */
 
-#include "common.h"
-
-#include <avr/io.h>
-#include <util/delay.h>
-
+#include "misc.h"
 #include "spi.h"
 
-void initSPI(void) {
+/* Initialize software SPI interface */
+void spiInit(void) {
 /* PIN   SPI   I/O
-   PC5   SCK   O
-   PC4   MISO  I
-   PC3   MOSI  O
-   PC2   RESET O
+   PD4   SCK   O
+   PD5   MISO  I
+   PD6   MOSI  O
+   PD7   RESET O
                                                                            */
-  #define DDRSPI DDRC
-  #define PORTSPI PORTC
-  #define PINSPI PINC
+  #define DDRSPI DDRD
+  #define PORTSPI PORTD
+  #define PINSPI PIND
 
-  #define SCK 5
-  #define MISO 4
-  #define MOSI 3
-  #define RESET 2
-  DDRSPI = (DDRSPI & ~_BV(MISO)) | _BV(SCK) | _BV(MOSI) | _BV(RESET);
+  #define SCK   PORTD4
+  #define MISO  PORTD5
+  #define MOSI  PORTD6
+  #define RESET PORTD7
+  DDRSPI = (DDRSPI & ~ _BV(MISO)) | _BV(SCK) | _BV(MOSI) | _BV(RESET);
   /* MOSI, MISO (pull up), RESET, SCK low */
-  PORTSPI = PORTSPI & ~(_BV(MOSI) | _BV(MISO) | _BV(RESET) | _BV(SCK));
+  PORTSPI &= ~ (_BV(MOSI) | _BV(MISO) | _BV(RESET) | _BV(SCK));
 }
 
-unsigned char transmitSPI(unsigned char transv) {
-  unsigned char i;
-  unsigned char recv;
+/* Switch on/off reset line
+   - r: 0 = MCU reset line on, other = off  */
+void spiReset(uint8_t r) {
+  if (r) {
+    PORTSPI |= _BV(RESET);
+  }
+  else {
+    PORTSPI &= ~ _BV(RESET);
+  }
+}
+
+/* Switch on/off SPI clock line
+   - r: 0 = SPI clock line on, other = off  */
+void spiSck(uint8_t c) {
+  if (c) {
+    PORTSPI |= _BV(SCK);
+  }
+  else {
+    PORTSPI &= ~ _BV(SCK);
+  }
+}
+
+/* Transmit and receive 1 byte
+   - transv: value to transmit
+   - return value: received byte     */
+uint8_t spiTransmit(uint8_t transv) {
+  uint8_t i;
+  uint8_t recv;
 
   recv = 0;
   for (i = _BV(7); i; i >>= 1) {
@@ -39,10 +61,10 @@ unsigned char transmitSPI(unsigned char transv) {
     else {
       PORTSPI &= ~_BV(MOSI);
     }
-    _delay_us(5);
+    delayUs(5);   ////
 
     PORTSPI |= _BV(SCK);
-    _delay_us(5);
+    delayUs(5);   ////
 
     PORTSPI &= ~_BV(SCK);
     recv = recv << 1 | (PINSPI >> MISO & 0x01);

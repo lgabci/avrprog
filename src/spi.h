@@ -3,7 +3,11 @@
 #ifndef __spi_h__
 #define __spi_h__
 
-void initSPI(void);
-unsigned char transmitSPI(unsigned char transv);
+#include "misc.h"
+
+void spiInit(void);
+void spiReset(uint8_t r);
+void spiSck(uint8_t c);
+uint8_t spiTransmit(uint8_t transv);
 
 #endif

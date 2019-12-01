@@ -3,8 +3,8 @@
 #ifndef __serial_h__
 #define __serial_h__
 
-void initUSART(void);
-unsigned char receive(unsigned char *c);
-void transmit(unsigned char c);
+void usartInit(void);
+uint8_t usartReceive(uint8_t *c);
+void usartTransmit(uint8_t c);
 
 #endif

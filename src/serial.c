@@ -1,12 +1,9 @@
 /* AVR programmer serial */
 
-#include "common.h"
-
-#include <avr/io.h>
-
+#include "misc.h"
 #include "serial.h"
 
-void initUSART(void) {
+void usartInit(void) {
 /* The STK500 uses: 115.2 kbps, 8 data bits, 1 stop bit, no parity
    UDR    ----------------------- UART data --------------------------
    UCSRA  RXC     TXC     UDRE    FE      DOR     PE      U2X     MPCM
@@ -25,8 +22,8 @@ void initUSART(void) {
 }
 
 /* Receive a character from USART, returns error */
-unsigned char receive(unsigned char *c) {
-  unsigned char err;
+uint8_t usartReceive(uint8_t *c) {
+  uint8_t err;
 
   while (! (UCSRA & _BV(RXC)))
     ;
@@ -36,7 +33,7 @@ unsigned char receive(unsigned char *c) {
 }
 
 /* Send a character on USART */
-void transmit(unsigned char c) {
+void usartTransmit(uint8_t c) {
   while (! (UCSRA & _BV(UDRE)));
   UDR = c;
 }

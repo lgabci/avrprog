@@ -23,6 +23,7 @@ AC_SUBST([AM_CFLAGS], ["-mmcu=atmega8a -O2 -pedantic -Wall -Werror"])
 AC_SUBST([OBJCOPYFLAGS], ["-j .text -j .data -O ihex"])
 
 AC_CONFIG_FILES([Makefile
-		 src/Makefile])
+                 src/Makefile
+                 testsrc/Makefile])
 
 AC_OUTPUT

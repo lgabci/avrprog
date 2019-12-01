@@ -1,11 +1,11 @@
 /* AVR programmer HD44780 */
 
-#include "common.h"
+#include "misc.h"
+#include "lcd.h"
 
-#include <avr/io.h>
-#include <util/delay.h>
-
-#include "hd44780.h"
+/* LCD rows and columns */
+#define LCDROWS 2
+#define LCDCOLS 16
 
 /* used port */
 #define PORTLCD PORTC
@@ -28,16 +28,16 @@
 #define CMDSETDADD 0x80  /* set DDRAM address       */
 
 /* waiting for commands to complete */
-#define DELAYCLS     _delay_ms(10)
-#define DELAYHOME    _delay_ms(1.52)
-#define DELAYEMODE   _delay_us(37)
-#define DELAYDONOFF  _delay_us(37)
-#define DELAYSHIFT   _delay_us(37)
-#define DELAYFNCSET  _delay_us(37)
-#define DELAYSETCADD _delay_us(37)
-#define DELAYSETDADD _delay_us(37)
+#define DELAYCLS     delayMs(10)
+#define DELAYHOME    delayMs(1.52)
+#define DELAYEMODE   delayUs(37)
+#define DELAYDONOFF  delayUs(37)
+#define DELAYSHIFT   delayUs(37)
+#define DELAYFNCSET  delayUs(37)
+#define DELAYSETCADD delayUs(37)
+#define DELAYSETDADD delayUs(37)
 
-#define DELAYWRTDATA _delay_us(37 + 4)
+#define DELAYWRTDATA delayUs(37 + 4)
 
 /* bit positions for commands */
 #define BITS  0 /* 0 = don't shift, 1 = shift */
@@ -59,17 +59,23 @@
 #define tDSW  0.80
 #define tH    0.10
 
-void sendNibble(const unsigned char rs, const  unsigned char n);
-void sendByte(const unsigned char rs, const unsigned char n);
+void sendNibble(const uint8_t rs, const  uint8_t n);
+void sendByte(const uint8_t rs, const uint8_t n);
 
-void initLcd(void) {
-  DDRC = 0x3f;					/* PC0-PC5 output */
+uint8_t x;                               /* cursor position */
+uint8_t y;
 
-  _delay_ms(15);
+uint8_t buf[LCDCOLS][LCDROWS - 1];  /* buffer for scrolling */
+
+/* Initialize LCD */
+void lcdInit(void) {
+  DDRC = 0x3f;                                  /* PC0-PC5 output */
+
+  delayMs(15);
   sendNibble(0, (CMDFNCSET | _BV(BITDL)) >> 4); /* function set */
-  _delay_ms(5);
+  delayMs(5);
   sendNibble(0, (CMDFNCSET | _BV(BITDL)) >> 4); /* function set */
-  _delay_us(200);
+  delayUs(200);
   sendNibble(0, (CMDFNCSET | _BV(BITDL)) >> 4); /* function set */
   DELAYFNCSET;
   sendNibble(0, (CMDFNCSET) >> 4); /* function set: 4 bit interface */
@@ -85,26 +91,85 @@ void initLcd(void) {
 
   sendByte(0, CMDDONOFF | _BV(BITD) | _BV(BITC) | _BV(BITB)); /* display on */
   DELAYDONOFF;
+
+  for (x = 0; x < LCDCOLS; x ++) {
+    for (y = 0; y < LCDROWS - 1; y ++) {
+      buf[x][y] = ' ';
+    }
+  }
+
+  x = 0;                                        /* set cursor position */
+  y = 0;
 }
 
-void writeChr(const char c) {
+/* Write a character to current position
+   break lines and scrolls
+   - c: char to write                     */
+void lcdWriteChr(const int8_t c) {
+  uint8_t i, j;
+
   sendByte(1, c);
   DELAYWRTDATA;
+  if (y > 0) {         /* save chars to buffer, except 1st line */
+    buf[x][y - 1] = c;
+  }
+  if (++ x >= LCDCOLS) {
+    if (++ y >= LCDROWS) {
+      for (j = 0; j < LCDROWS; j ++) {
+        lcdSetPos(0, j);                          /* scrolling */
+        for (i = 0; i < LCDCOLS; i ++) {
+          sendByte(1, j < LCDROWS - 1 ? buf[i][j] : ' ');
+          DELAYWRTDATA;
+          if (j < LCDROWS - 1) {
+            buf[i][j] = j < LCDROWS - 2 ? buf[i][j + 1] : ' ';
+          }
+        }
+      }
+      y = LCDROWS - 1;
+    }
+    x = 0;
+    lcdSetPos(x, y);
+  }
 }
 
-void writeStr(const char *c) {
+/* Write a string to current position
+   break lines and scrolls
+   - c: string to write                   */
+void lcdWriteStr(const int8_t *c) {
   while (*c) {
-    writeChr(*c);
+    lcdWriteChr(*c);
     c ++;
   }
 }
 
-void setPos(const unsigned char col, const unsigned char row) {
-  sendByte(0, CMDSETDADD | (((row << 6) + col) & (CMDSETDADD - 1)));
-  DELAYSETDADD;
+/* Write a hex value to current position
+   break lines and scrolls
+   - c: byte value to print               */
+void lcdWriteHex(const uint8_t c) {
+  int8_t str[3];
+
+  hex(c, str);
+  lcdWriteStr(str);
 }
 
-void sendNibble(const unsigned char rs, const unsigned char n) {
+/* Set cursor position
+   - col: column, 0 based
+   - row: row, 0 based                    */
+void lcdSetPos(const uint8_t col, const uint8_t row) {
+  uint8_t rows[4] = {0, 0x40, 0x14, 0x54};
+
+  if (row < LCDROWS && col < LCDCOLS) {
+    sendByte(0, CMDSETDADD | ((rows[row] + col) & (CMDSETDADD - 1)));
+    DELAYSETDADD;
+    x = col;
+    y = row;
+  }
+}
+
+/* Send a 4 bit nibble to the LCD
+   - rs: 0 = command, 1 = data
+   - n: value to send, using low 4 bits   */
+void sendNibble(const uint8_t rs, const uint8_t n) {
 /* timing
 
    Item                                 Symbol     Min     Typ     Max     Unit
@@ -128,7 +193,7 @@ void sendNibble(const unsigned char rs, const unsigned char n) {
                  :         :                :
                            <----- PWEH ----->
                            :________________:                 ____
-          E  ______________/                \________________/   
+          E  ______________/                \________________/
                         -->:<-- tEr      -->:<-- tEf         :
                            :     <-- tDSW --x-- tH --->      :
              ____________________:____________________:___________
@@ -137,15 +202,17 @@ void sendNibble(const unsigned char rs, const unsigned char n) {
                            <------------- tcycE ------------->
  */
   PORTLCD = (n & (_BV(B0) | _BV(B1) | _BV(B2) | _BV(B3))) | (rs ? _BV(RS) : 0);
-  _delay_us(tAS);
+  delayUs(tAS);
   PORTLCD |= _BV(EN);
-  _delay_us(PWEH);
+  delayUs(PWEH);
   PORTLCD &= ~_BV(EN);
-  _delay_us(tcycE - PWEH - tAS);
+  delayUs(tcycE - PWEH - tAS);
 }
 
-void sendByte(const unsigned char rs, const unsigned char n) {
+/* Send a byte to the LCD
+   - rs: 0 = command, 1 = data
+   - n: value to send                     */
+void sendByte(const uint8_t rs, const uint8_t n) {
   sendNibble(rs, n >> 4);
   sendNibble(rs, n);
 }
-
