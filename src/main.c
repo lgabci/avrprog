@@ -12,7 +12,6 @@ int main() {
   lcdInit();
   emClockInit();
   usartInit();
-  spiInit();
 
   /* // ------------------------------------------------- */
 #if 0

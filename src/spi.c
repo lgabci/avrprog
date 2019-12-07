@@ -3,25 +3,27 @@
 #include "misc.h"
 #include "spi.h"
 
+#define DDRSPI DDRD
+#define PORTSPI PORTD
+#define PINSPI PIND
+
+#define SCK   PORTD4
+#define MISO  PORTD5
+#define MOSI  PORTD6
+#define RESET PORTD7
+
 /* Initialize software SPI interface */
 void spiInit(void) {
-/* PIN   SPI   I/O
-   PD4   SCK   O
-   PD5   MISO  I
-   PD6   MOSI  O
-   PD7   RESET O
-                                                                           */
-  #define DDRSPI DDRD
-  #define PORTSPI PORTD
-  #define PINSPI PIND
-
-  #define SCK   PORTD4
-  #define MISO  PORTD5
-  #define MOSI  PORTD6
-  #define RESET PORTD7
+  /* input: MISO, output: SCK, MOSI, RESET, */
   DDRSPI = (DDRSPI & ~ _BV(MISO)) | _BV(SCK) | _BV(MOSI) | _BV(RESET);
-  /* MOSI, MISO (pull up), RESET, SCK low */
-  PORTSPI &= ~ (_BV(MOSI) | _BV(MISO) | _BV(RESET) | _BV(SCK));
+
+  /* MOSI, MISO (pull up), SCK low, RESET HIGH */
+  PORTSPI = (PORTSPI & ~ (_BV(MOSI) | _BV(MISO) | _BV(SCK))) | _BV(RESET);
+}
+
+/* Close software SPI interface */
+void spiClose(void) {
+  // TODO
 }
 
 /* Switch on/off reset line
@@ -61,10 +63,10 @@ uint8_t spiTransmit(uint8_t transv) {
     else {
       PORTSPI &= ~_BV(MOSI);
     }
-    delayUs(5);   ////
+    delayUs(10);   ////
 
     PORTSPI |= _BV(SCK);
-    delayUs(5);   ////
+    delayUs(10);   ////
 
     PORTSPI &= ~_BV(SCK);
     recv = recv << 1 | (PINSPI >> MISO & 0x01);

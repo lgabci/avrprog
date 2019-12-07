@@ -5,11 +5,28 @@
 
 #include "misc.h"
 
-uint8_t enterProgModeIsp(uint8_t timeout, uint8_t stabDelay,
-  uint8_t cmdexeDelay, uint8_t synchLoops, uint8_t byteDelay,
-  uint8_t pollValue, uint8_t pollIndex, const uint8_t *cmd);
-uint8_t readFuseIsp(uint8_t retAddr, const uint8_t *cmd, uint8_t *val);
-uint8_t loadAddress(const uint8_t *cmd);
-uint8_t readFlashIsp(uint16_t blockSize, uint8_t cmd, uint8_t *data);
+void signOn(uint16_t *msgSize, uint8_t *msg);  //
+void setParameter(uint16_t *msgSize, uint8_t *msg);
+void getParameter(uint16_t *msgSize, uint8_t *msg);
+void oscCal(uint16_t *msgSize, uint8_t *msg);  //
+void loadAddress(uint16_t *msgSize, uint8_t *msg);
+void firmwareUpgrade(uint16_t *msgSize, uint8_t *msg);  //
+
+void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg);
+void leaveProgModeIsp(uint16_t *msgSize, uint8_t *msg);
+void chipEraseIsp(uint16_t *msgSize, uint8_t *msg);
+void programFlashIsp(uint16_t *msgSize, uint8_t *msg);
+void readFlashIsp(uint16_t *msgSize, uint8_t *msg);
+void programEepromIsp(uint16_t *msgSize, uint8_t *msg);  //
+void readEepromIsp(uint16_t *msgSize, uint8_t *msg);  //
+void programFuseIsp(uint16_t *msgSize, uint8_t *msg);  //
+void readFuseIsp(uint16_t *msgSize, uint8_t *msg);
+void programLockIsp(uint16_t *msgSize, uint8_t *msg);  //
+void readLockIsp(uint16_t *msgSize, uint8_t *msg);  //
+void readSignatureIsp(uint16_t *msgSize, uint8_t *msg);  //
+void readOscCalIsp(uint16_t *msgSize, uint8_t *msg);  //
+void spiMulti(uint16_t *msgSize, uint8_t *msg);  //
+
+void cksumError(uint16_t *msgSize, uint8_t *msg);  //
 
 #endif
