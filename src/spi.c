@@ -2,6 +2,7 @@
 
 #include "misc.h"
 #include "spi.h"
+#include <util/delay_basic.h>
 
 #define DDRSPI DDRD
 #define PORTSPI PORTD
@@ -12,12 +13,26 @@
 #define MOSI  PORTD6
 #define RESET PORTD7
 
+static int8_t dur = 0;     /* ISP clock duration */
+
+/* delays dur CPU clocks */
+void spiClockDelay(void) {
+  if (dur) {
+    _delay_loop_1(dur);
+  }
+}
+
+/* set dur */
+void spiSetSckDuration(uint8_t n) {
+  dur = (n + 2) / 3;
+}
+
 /* Initialize software SPI interface */
 void spiInit(void) {
   /* input: MISO, output: SCK, MOSI, RESET, */
   DDRSPI = (DDRSPI & ~ _BV(MISO)) | _BV(SCK) | _BV(MOSI) | _BV(RESET);
 
-  /* MOSI, MISO (pull up), SCK low, RESET HIGH */
+  /* up: RESET, low: MOSI, MISO (pull up), SCK */
   PORTSPI = (PORTSPI & ~ (_BV(MOSI) | _BV(MISO) | _BV(SCK))) | _BV(RESET);
 }
 
@@ -29,23 +44,14 @@ void spiClose(void) {
 /* Switch on/off reset line
    - r: 0 = MCU reset line on, other = off  */
 void spiReset(uint8_t r) {
-  if (r) {
-    PORTSPI |= _BV(RESET);
-  }
-  else {
-    PORTSPI &= ~ _BV(RESET);
-  }
+  // TODO: reset polarity
+  PORTSPI = r ? PORTSPI | _BV(RESET) : PORTSPI & ~ _BV(RESET);
 }
 
 /* Switch on/off SPI clock line
    - r: 0 = SPI clock line on, other = off  */
 void spiSck(uint8_t c) {
-  if (c) {
-    PORTSPI |= _BV(SCK);
-  }
-  else {
-    PORTSPI &= ~ _BV(SCK);
-  }
+  PORTSPI = c ? PORTSPI | _BV(SCK) : PORTSPI & ~ _BV(SCK);
 }
 
 /* Transmit and receive 1 byte
@@ -57,16 +63,11 @@ uint8_t spiTransmit(uint8_t transv) {
 
   recv = 0;
   for (i = _BV(7); i; i >>= 1) {
-    if (transv & i) {
-      PORTSPI |= _BV(MOSI);
-    }
-    else {
-      PORTSPI &= ~_BV(MOSI);
-    }
-    delayUs(10);   ////
+    PORTSPI = transv & i ? PORTSPI | _BV(MOSI) : PORTSPI & ~_BV(MOSI);
+    spiClockDelay();
 
     PORTSPI |= _BV(SCK);
-    delayUs(10);   ////
+    spiClockDelay();
 
     PORTSPI &= ~_BV(SCK);
     recv = recv << 1 | (PINSPI >> MISO & 0x01);

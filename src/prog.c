@@ -52,21 +52,33 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
   uint8_t j;
   uint8_t rv;
 
+  // TODO: LEDs
+
   if (*msgSize == 12) {
-    spiInit();  /* SPI SCK = 0, SPI MOSI = 0, RESET = 1, this the default */
+// --------------------------
+// 0. sck = 0, mosi = 0
+// 1. reset = 0 (+)
+// 2. stabdelay
+// 3. spiClockDelay();  ??? maybe
+// 4. reset = 1 (-)
+// 5. spiClockDelay();
+// 6. reset = 0 (+)
+
+    spiInit();  /* SPI SCK = 0, SPI MOSI = 0, RESET = 1, this is the default */
     // TODO: spiInit -->2 step: 1, only reset; 2 after stabDelay CK + MOSI
     delayMs(stabDelay);
 
-    spiReset(1);  /* RESET: positive pulse, 2 CPU clock cycle */
-    delayMs(2);   // 2* clock
+    spiReset(1);  /* RESET  pulse */
+    spiClockDelay();
     spiReset(0);
+// --------------------------
 
     delayMs(cmdexeDelay);
 
     ok = 0;
     for (j = 0; j < synchLoops; j ++) {
 
-      // wdt
+      // wdt reset
 
       for (i = 0; i < 4; i ++) {
         rv = spiTransmit(cmd[i]);  /* Programming Enable serial instruction  */
@@ -81,8 +93,9 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
       }
 
       spiSck(1);   /* trying to sync: SPI SCK pulse */
-      delayMs(5);   // ? clock
+      spiClockDelay();
       spiSck(0);
+      spiClockDelay();
     }
 
     *msgSize = 2;
@@ -434,6 +447,11 @@ void setParameter(uint16_t *msgSize, uint8_t *msg) {
   uint8_t val = msg[2];
   uint8_t *status = &msg[1];
 
+//  lcdWriteChr(':');  //
+//  lcdWriteHex(par);  //
+//  lcdWriteChr('=');  //
+//  lcdWriteHex(val);  //
+//  lcdWriteChr(':');  //
   if (*msgSize == 3) {
     switch (par) {
       case PARAM_VTARGET:
@@ -472,7 +490,9 @@ void setParameter(uint16_t *msgSize, uint8_t *msg) {
         statusReg = STATUS_CMD_OK;
         break;
       case PARAM_SCK_DURATION:
-        sckDuration = val;  // TODO
+        sckDuration = val;
+        spiSetSckDuration(sckDuration);
+        lcdWriteHex(sckDuration);  //
         statusReg = STATUS_CMD_OK;
         break;
       case PARAM_RESET_POLARITY:

@@ -5,6 +5,8 @@
 
 #include "misc.h"
 
+void spiClockDelay(void);
+void spiSetSckDuration(uint8_t n);
 void spiInit(void);
 void spiClose(void);
 void spiReset(uint8_t r);
