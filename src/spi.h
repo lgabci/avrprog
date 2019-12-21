@@ -11,6 +11,7 @@ void spiInit(void);
 void spiClose(void);
 void spiReset(uint8_t r);
 void spiSck(uint8_t c);
+void spiMosi(uint8_t m);
 uint8_t spiTransmit(uint8_t transv);
 
 #endif

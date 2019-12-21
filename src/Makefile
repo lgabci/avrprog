@@ -47,8 +47,8 @@ $(PROGH): $(PROG)
 
 # test -----------------------------------------
 USBDEV=/dev/ttyUSB0
-TESTADVERFLAGS = -p m8 -B 1Mhz -c stk500v2 -P $(USBDEV) -v -U flash:v:$<:i
-TESTADWRTFLAGS = -p m8 -B 1Mhz -c stk500v2 -P $(USBDEV) -v -U flash:w:$<:i
+TESTADVERFLAGS = -p m8 -B 1MHz -c stk500v2 -P $(USBDEV) -v -U flash:v:$<:i
+TESTADWRTFLAGS = -p m8 -B 1MHz -c stk500v2 -P $(USBDEV) -v -U flash:w:$<:i
 
 TESTPROG := testavrprog.elf
 TESTPROGH := $(TESTPROG:.elf=.hex)

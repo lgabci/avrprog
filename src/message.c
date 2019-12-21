@@ -201,7 +201,7 @@ void processMessage() {
       loadAddress(&msgSize, msg);
       return;
     case CMD_FIRMWARE_UPGRADE:
-      if (msgSize == 11) {
+      if (msgSize == 11) {  // TODO
         msgSize = 2;
         msg[1] = STATUS_CMD_FAILED;     /* formware upgrade is always fail */
         statusReg = msg[1];
@@ -229,11 +229,39 @@ void processMessage() {
       return;
       break;
 
+    case CMD_PROGRAM_EEPROM_ISP:
+      programEepromIsp(&msgSize, msg);
+      return;
+      break;
+
+    case CMD_READ_EEPROM_ISP:
+      readEepromIsp(&msgSize, msg);
+      return;
+      break;
+
+    case CMD_PROGRAM_FUSE_ISP:
+      programFuseIsp(&msgSize, msg);
+      return;
+      break;
+
     case CMD_READ_FUSE_ISP:
-    case CMD_READ_SIGNATURE_ISP:
       readFuseIsp(&msgSize, msg);
       return;
       break;
+
+    //case CMD_PROGRAM_LOCK_ISP:
+
+    //case CMD_READ_LOCK_ISP:
+
+    case CMD_READ_SIGNATURE_ISP:
+      readSignatureIsp(&msgSize, msg);
+      return;
+      break;
+
+    //case CMD_READ_OSCCAL_ISP:
+
+    //case CMD_SPI_MULTI:
+
   }
 
   // TODO: error on unknown commands: STATUS_CMD_UNKNOWN
