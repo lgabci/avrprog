@@ -208,7 +208,29 @@ static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {
   *status = statusReg;
 }
 
-void signOn(uint16_t *msgSize, uint8_t *msg);  // TODO
+void signOn(uint16_t *msgSize, uint8_t *msg) {
+  uint8_t *status = &msg[1];
+  uint8_t *len = &msg[2];
+  uint8_t *sign = &msg[3];
+  const uint8_t *stk = (uint8_t *)"STK500_2";
+
+  uint8_t i;
+
+  if (*msgSize == 1) {
+    *msgSize = 11;
+    *len = 8;                   /* length of signature string */
+    for(i = *len; i; i --) {
+      *(sign ++) = *(stk ++);
+    }
+    statusReg = STATUS_CMD_OK;
+  }
+  else {
+    *msgSize = 2;
+    statusReg = STATUS_CMD_FAILED;
+  }
+
+  *status = statusReg;
+}
 
 void setParameter(uint16_t *msgSize, uint8_t *msg) {
   uint8_t par = msg[1];
@@ -387,7 +409,19 @@ void loadAddress(uint16_t *msgSize, uint8_t *msg) {
   *status = statusReg;
 }
 
-void firmwareUpgrade(uint16_t *msgSize, uint8_t *msg);  //
+void firmwareUpgrade(uint16_t *msgSize, uint8_t *msg) {
+  uint8_t *status = &msg[1];
+
+  if (*msgSize == 11) {
+    *msgSize = 2;
+    statusReg = STATUS_CMD_FAILED;  /* firmware upgrade always fails */
+  }
+  else {
+    *msgSize = 2;
+    statusReg = STATUS_CMD_FAILED;  // TODO: maybe other error?
+  }
+  *status = statusReg;
+}
 
 void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
   //uint8_t timeout = msg[1];
@@ -563,9 +597,13 @@ void readFuseIsp(uint16_t *msgSize, uint8_t *msg) {
   *status1 = statusReg;
 }
 
-void programLockIsp(uint16_t *msgSize, uint8_t *msg);  //
+void programLockIsp(uint16_t *msgSize, uint8_t *msg) {
+  programFuseIsp(msgSize, msg);
+}
 
-void readLockIsp(uint16_t *msgSize, uint8_t *msg);  //
+void readLockIsp(uint16_t *msgSize, uint8_t *msg) {
+  readFuseIsp(msgSize, msg);
+}
 
 void readSignatureIsp(uint16_t *msgSize, uint8_t *msg) {
   readFuseIsp(msgSize, msg);

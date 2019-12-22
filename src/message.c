@@ -165,21 +165,8 @@ void processMessage() {
 
   switch(msg[0]) {
     case CMD_SIGN_ON:
-      if (msgSize == 1) {
-        msgSize = 11;
-        msg[1] = STATUS_CMD_OK;     /* message status */
-        msg[2] = 8;                 /* length of signature string */
-        msg[3] = 'S';
-        msg[4] = 'T';
-        msg[5] = 'K';
-        msg[6] = '5';
-        msg[7] = '0';
-        msg[8] = '0';
-        msg[9] = '_';
-        msg[10] = '2';
-        statusReg = STATUS_CMD_OK;
-        return;
-      }
+      signOn(&msgSize, msg);
+      return;
       break;
     case CMD_SET_PARAMETER:
       setParameter(&msgSize, msg);
@@ -200,13 +187,11 @@ void processMessage() {
     case CMD_LOAD_ADDRESS:
       loadAddress(&msgSize, msg);
       return;
+      break;
     case CMD_FIRMWARE_UPGRADE:
-      if (msgSize == 11) {  // TODO
-        msgSize = 2;
-        msg[1] = STATUS_CMD_FAILED;     /* formware upgrade is always fail */
-        statusReg = msg[1];
-        return;
-      }
+      firmwareUpgrade(&msgSize, msg);
+      return;
+      break;
     case CMD_ENTER_PROGMODE_ISP:
       enterProgModeIsp(&msgSize, msg);
       return;
@@ -249,9 +234,15 @@ void processMessage() {
       return;
       break;
 
-    //case CMD_PROGRAM_LOCK_ISP:
+    case CMD_PROGRAM_LOCK_ISP:
+      programLockIsp(&msgSize, msg);
+      return;
+      break;
 
-    //case CMD_READ_LOCK_ISP:
+    case CMD_READ_LOCK_ISP:
+      readLockIsp(&msgSize, msg);
+      return;
+      break;
 
     case CMD_READ_SIGNATURE_ISP:
       readSignatureIsp(&msgSize, msg);
