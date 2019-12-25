@@ -177,12 +177,8 @@ void processMessage() {
       return;
       break;
     case CMD_OSCCAL:
-      if (msgSize == 1) {
-        msgSize = 2;     // TODO
-        msg[1] = STATUS_CMD_OK;
-        statusReg = msg[1];
-        return;
-      }
+      osccal(&msgSize, msg);
+      return;
       break;
     case CMD_LOAD_ADDRESS:
       loadAddress(&msgSize, msg);
@@ -249,9 +245,15 @@ void processMessage() {
       return;
       break;
 
-    //case CMD_READ_OSCCAL_ISP:
+    case CMD_READ_OSCCAL_ISP:
+      readOsccalIsp(&msgSize, msg);
+      return;
+      break;
 
-    //case CMD_SPI_MULTI:
+    case CMD_SPI_MULTI:
+      ispMulti(&msgSize, msg);
+      return;
+      break;
 
   }
 

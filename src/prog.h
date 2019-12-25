@@ -8,7 +8,7 @@
 void signOn(uint16_t *msgSize, uint8_t *msg);
 void setParameter(uint16_t *msgSize, uint8_t *msg);
 void getParameter(uint16_t *msgSize, uint8_t *msg);
-void oscCal(uint16_t *msgSize, uint8_t *msg);  //
+void osccal(uint16_t *msgSize, uint8_t *msg);  //
 void loadAddress(uint16_t *msgSize, uint8_t *msg);
 void firmwareUpgrade(uint16_t *msgSize, uint8_t *msg);
 void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg);
@@ -23,8 +23,8 @@ void readFuseIsp(uint16_t *msgSize, uint8_t *msg);
 void programLockIsp(uint16_t *msgSize, uint8_t *msg);
 void readLockIsp(uint16_t *msgSize, uint8_t *msg);
 void readSignatureIsp(uint16_t *msgSize, uint8_t *msg);
-void readOscCalIsp(uint16_t *msgSize, uint8_t *msg);  //
-void spiMulti(uint16_t *msgSize, uint8_t *msg);  //
+void readOsccalIsp(uint16_t *msgSize, uint8_t *msg);
+void ispMulti(uint16_t *msgSize, uint8_t *msg);
 
 void cksumError(uint16_t *msgSize, uint8_t *msg);  //
 

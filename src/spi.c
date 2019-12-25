@@ -2,6 +2,7 @@
 
 #include "misc.h"
 #include "spi.h"
+#include "lcd.h"  //
 #include <util/delay_basic.h>
 
 #define DDRSPI DDRD
@@ -55,7 +56,7 @@ void spiClose(void) {
 }
 
 /* Switch on/off reset line
-   - r: 0 = MCU reset line on, other = off  */
+   - r: 0 = MCU reset line off, other = on  */
 void spiReset(uint8_t r) {
   // TODO: reset polarity
   if (r) {
@@ -67,7 +68,7 @@ void spiReset(uint8_t r) {
 }
 
 /* Switch on/off SPI clock line
-   - r: 0 = SPI clock line on, other = off  */
+   - r: 0 = SPI clock line off, other = on  */
 void spiSck(uint8_t c) {
   if (c) {
     PORTSPI |= _BV(SCK);
@@ -78,7 +79,7 @@ void spiSck(uint8_t c) {
 }
 
 /* Switch on/off SPI MOSI line
-   - r: 0 = SPI clock line on, other = off  */
+   - r: 0 = SPI clock line off, other = on  */
 void spiMosi(uint8_t m) {
   if (m) {
     PORTSPI |= _BV(MOSI);
@@ -95,30 +96,43 @@ uint8_t spiTransmit(uint8_t transv) {
   return (*spiTransmitP)(transv);
 }
 
+
+/*
+   SPI waveforms:
+             MSB                                       LSB
+            _____ _____ _____ _____ _____ _____ _____ _____
+   MOSI  __/_____X_____X_____X_____X_____X_____X_____X_____\___
+              :
+            __:__ _____ _____ _____ _____ _____ _____ _____
+   MISO  __/_____X_____X_____X_____X_____X_____X_____X_____\___
+              : :
+              :_:    _     _     _     _     _     _     _
+    SCK  _____| |___| |___| |___| |___| |___| |___| |___| |____
+
+*/
+
 /* Transmit and receive 1 byte with SPI clock delay
    - transv: value to transmit
    - return value: received byte     */
 static uint8_t spiTransmitDelay(uint8_t transv) {
-  // TODO: create macro for this two function body
   uint8_t i;
   uint8_t recv;
 
   recv = 0;
   for (i = _BV(7); i; i >>= 1) {
-    if (transv & i) {
-      PORTSPI |= _BV(MOSI);
-    }
-    else {
-      PORTSPI &= ~_BV(MOSI);
-    }
+    spiMosi(transv & i);
     spiClockDelay();
+    spiSck(1);
 
-    PORTSPI |= _BV(SCK);
     spiClockDelay();
-
-    PORTSPI &= ~_BV(SCK);
-    recv = recv << 1 | (PINSPI >> MISO & 0x01);
+    recv <<= 1;
+    if (PINSPI & _BV(MISO)) {
+      recv ++;
+    }
+    spiSck(0);
   }
+  spiMosi(0);
+
   return recv;
 }
 
@@ -126,23 +140,21 @@ static uint8_t spiTransmitDelay(uint8_t transv) {
    - transv: value to transmit
    - return value: received byte     */
 static uint8_t spiTransmitNoDelay(uint8_t transv) {
-  // TODO: create macro for this two function body
   uint8_t i;
   uint8_t recv;
 
   recv = 0;
   for (i = _BV(7); i; i >>= 1) {
-    if (transv & i) {
-      PORTSPI |= _BV(MOSI);
-    }
-    else {
-      PORTSPI &= ~_BV(MOSI);
-    }
+    spiMosi(transv & i);
+    spiSck(1);
 
-    PORTSPI |= _BV(SCK);
-
-    PORTSPI &= ~_BV(SCK);
-    recv = recv << 1 | (PINSPI >> MISO & 0x01);
+    recv <<= 1;
+    if (PINSPI & _BV(MISO)) {
+      recv ++;
+    }
+    spiSck(0);
   }
+  spiMosi(0);
+
   return recv;
 }

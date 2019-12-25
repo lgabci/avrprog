@@ -15,8 +15,8 @@
 static uint8_t statusReg = STATUS_CMD_OK;  /* status register              */
 
 static uint32_t address = 0;
-static uint8_t vtarget = 0;        /* VTARGET, always 5.0v                 */
-static uint8_t vadjust = 0;        /* VADJUST, always 5.0v                 */
+static uint8_t vtarget = 50;       /* VTARGET, always 5.0v                 */
+static uint8_t vadjust = 50;       /* VADJUST, always 5.0v                 */
 static uint8_t resetPolarity = 0;  /* 0 = AT89 (8051), 1 = AT90 (AVR)      */
 static uint8_t oscPscale = 0;      /* oscillator timer prescaler value     */
 static uint8_t oscCmatch = 0;      /* oscillator timer compare match value */
@@ -389,7 +389,21 @@ void getParameter(uint16_t *msgSize, uint8_t *msg) {
   *status = statusReg;
 }
 
-void oscCal(uint16_t *msgSize, uint8_t *msg);  //
+void osccal(uint16_t *msgSize, uint8_t *msg) {
+  uint8_t *status = &msg[1];
+
+  if (*msgSize == 1) {
+    // TODO
+
+    *msgSize = 2;
+    statusReg = STATUS_CMD_OK;
+  }
+  else {
+    *msgSize = 2;
+    statusReg = STATUS_CMD_FAILED;
+  }
+  *status = statusReg;
+}
 
 void loadAddress(uint16_t *msgSize, uint8_t *msg) {
   uint8_t *cmd = &msg[1];
@@ -436,6 +450,8 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
 
   uint8_t ok = 0;   // ?
   uint8_t i;
+  uint8_t j;
+  uint8_t v;
 
   // TODO: LEDs
 
@@ -455,8 +471,16 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
 
       // wdt reset
 
-      if (transmitPacket(cmd, pollIndex - 1, byteDelay) == pollValue) {
-        ok = 1;
+      for (j = 0; j < 4; j ++) {
+        v = spiTransmit(cmd[j]);
+        delayMs(byteDelay);
+
+        if (j == pollIndex - 1 && v == pollValue) {
+          ok = 1;
+        }
+      }
+
+      if (ok) {
         break;
       }
 
@@ -609,8 +633,55 @@ void readSignatureIsp(uint16_t *msgSize, uint8_t *msg) {
   readFuseIsp(msgSize, msg);
 }
 
-void readOscCalIsp(uint16_t *msgSize, uint8_t *msg);  //
+void readOsccalIsp(uint16_t *msgSize, uint8_t *msg) {
+  readFuseIsp(msgSize, msg);
+}
 
-void spiMulti(uint16_t *msgSize, uint8_t *msg);  //
+void ispMulti(uint16_t *msgSize, uint8_t *msg) {
+  uint8_t numTx = msg[1];
+  uint8_t numRx = msg[2];
+  uint8_t rxStartAddr = msg[3];
+  uint8_t *txData = &msg[4];
+
+  uint8_t *status1 = &msg[1];
+  uint8_t *data = &msg[2];
+  uint8_t *status2 = &msg[numRx + 2];
+
+
+  // TODO: wdt reset?
+
+  if (*msgSize >= 3 && *msgSize == numRx + 4) {
+    uint8_t v;
+
+    *msgSize = numRx + 3;
+    while (numTx || numRx) {
+      if (numTx) {
+        v = spiTransmit(*(txData ++));
+        numTx --;
+      }
+      else {
+        v = spiTransmit(0);
+      }
+
+      if (rxStartAddr == 0) {
+        if (numRx) {
+          *(data ++) = v;
+          numRx --;
+        }
+      }
+      else {
+        rxStartAddr --;
+      }
+    }
+
+    statusReg = STATUS_CMD_OK;
+    *status2 = statusReg;
+  }
+  else {
+    *msgSize = 2;
+    statusReg = STATUS_CMD_FAILED;
+  }
+  *status1 = statusReg;
+}
 
 void cksumError(uint16_t *msgSize, uint8_t *msg);  //
