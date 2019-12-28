@@ -29,7 +29,7 @@ endif
 
 VPATH := $(MKFILEDIR)
 
-SOURCES := main.c lcd.c message.c misc.c prog.c serial.c spi.c
+SOURCES := main.c message.c misc.c prog.c serial.c spi.c led.c
 OBJS := $(SOURCES:.c=.o)
 
 %.hex:

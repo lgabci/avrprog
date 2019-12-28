@@ -2,7 +2,6 @@
 
 #include "misc.h"
 #include "spi.h"
-#include "lcd.h"  //
 #include <util/delay_basic.h>
 
 #define DDRSPI DDRD

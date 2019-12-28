@@ -5,19 +5,19 @@
 #include "serial.h"
 #include "prog.h"
 #include "command.h"
-#include "lcd.h"  /////
 
 #define MAXMSGSIZE 100
 static uint8_t seq;              /* message sequence    */
 static uint16_t msgSize;         /* message size in msg */
+static uint8_t chksum;           /* message checksum    */
 static uint8_t msg[MAXMSGSIZE];  /* message body        */
 
 uint8_t statusReg;  //
 
-/* reads a message */
+/* reads a message
+   - return: 1 = succes, 0 = error */
 void readMessage() {
   uint8_t c;
-  uint8_t chksum;
   uint16_t i;
 
 /* parameter        size  description
@@ -34,7 +34,7 @@ void readMessage() {
    start            read char  char == 0x1B              get seq
                     read char  char != 0x1B              start
 
-   get seq          read char  store seq                 get msg size1
+   get seq number   read char  store seq                 get msg size1
 
    get msg size1    read char  store size1               get msg size2
 
@@ -51,16 +51,15 @@ void readMessage() {
 
   while (1) {
     /* start */
-    chksum = 0;
     if (! usartReceive(&c)) {
       continue;
     }
     if (c != MESSAGE_START) {
       continue;
     }
-    chksum ^= c;
+    chksum = c;
 
-    /* get seq */
+    /* get seq number */
     if (! usartReceive(&seq)) {
       continue;
     }
@@ -78,7 +77,7 @@ void readMessage() {
       continue;
     }
     chksum ^= c;
-    msgSize |= c;
+    msgSize += c;
 
     /* get token */
     if (! usartReceive(&c)) {
@@ -92,33 +91,30 @@ void readMessage() {
     /* get data, read even if it is too long */
     for (i = 0; i < msgSize; i ++) {
       if (! usartReceive(&c)) {
-        continue;
+        break;
       }
       chksum ^= c;
 
-      if (msgSize <= MAXMSGSIZE) {  /* store message if it is not too long */
+      if (i < MAXMSGSIZE) {  /* store message if it is not too long */
         msg[i] = c;
       }
+    }
+    if (i < msgSize) {
+      continue;
     }
 
     /* get checksum */
     if (! usartReceive(&c)) {
       continue;
     }
-    if (c != chksum) {
-      continue;
-    }
-    if (msgSize > MAXMSGSIZE) {
-      msg[i] = c;
-    }
+    chksum ^= c;
 
-    break;
+    return;
   }
 }
 
 /* send message */
 void sendMessage() {
-  uint8_t checksum;
   uint16_t i;
 
 /* parameter        size  description
@@ -129,140 +125,102 @@ void sendMessage() {
    MSG_BODY     MSG_SIZE  message body, from 0 to 65535 bytes
    CHECKSUM            1  XOR all bytes in message                         */
 
-  checksum = 0;
   usartTransmit(MESSAGE_START);
-  checksum ^= MESSAGE_START;
+  chksum = MESSAGE_START;
 
   usartTransmit(seq);
-  checksum ^= seq;
+  chksum ^= seq;
 
   usartTransmit(msgSize >> 8);
-  checksum ^= msgSize >> 8;
+  chksum ^= msgSize >> 8;
 
   usartTransmit(msgSize & 0xff);
-  checksum ^= msgSize & 0xff;
+  chksum ^= msgSize & 0xff;
 
   usartTransmit(TOKEN);
-  checksum ^= TOKEN;
+  chksum ^= TOKEN;
 
   for (i = 0; i < msgSize; i ++) {
     usartTransmit(msg[i]);
-    checksum ^= msg[i];
+    chksum ^= msg[i];
   }
 
-  usartTransmit(checksum);
-
-  // TODO: checksum error?
+  usartTransmit(chksum);
 }
 
-//uint8_t last = 0;         //
 /* process message */
 void processMessage() {
-//  if (last != msg[0]) {   //
-//    lcdWriteHex(msg[0]);  //
-//    last = msg[0];        //
-//  }                       //
-
-  switch(msg[0]) {
-    case CMD_SIGN_ON:
-      signOn(&msgSize, msg);
-      return;
-      break;
-    case CMD_SET_PARAMETER:
-      setParameter(&msgSize, msg);
-      return;
-      break;
-    case CMD_GET_PARAMETER:
-      getParameter(&msgSize, msg);
-      return;
-      break;
-    case CMD_OSCCAL:
-      osccal(&msgSize, msg);
-      return;
-      break;
-    case CMD_LOAD_ADDRESS:
-      loadAddress(&msgSize, msg);
-      return;
-      break;
-    case CMD_FIRMWARE_UPGRADE:
-      firmwareUpgrade(&msgSize, msg);
-      return;
-      break;
-    case CMD_ENTER_PROGMODE_ISP:
-      enterProgModeIsp(&msgSize, msg);
-      return;
-      break;
-    case CMD_LEAVE_PROGMODE_ISP:
-      leaveProgModeIsp(&msgSize, msg);
-      return;
-      break;
-    case CMD_CHIP_ERASE_ISP:
-      chipEraseIsp(&msgSize, msg);
-      return;
-      break;
-    case CMD_PROGRAM_FLASH_ISP:
-      programFlashIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_READ_FLASH_ISP:
-      readFlashIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_PROGRAM_EEPROM_ISP:
-      programEepromIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_READ_EEPROM_ISP:
-      readEepromIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_PROGRAM_FUSE_ISP:
-      programFuseIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_READ_FUSE_ISP:
-      readFuseIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_PROGRAM_LOCK_ISP:
-      programLockIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_READ_LOCK_ISP:
-      readLockIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_READ_SIGNATURE_ISP:
-      readSignatureIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_READ_OSCCAL_ISP:
-      readOsccalIsp(&msgSize, msg);
-      return;
-      break;
-
-    case CMD_SPI_MULTI:
-      ispMulti(&msgSize, msg);
-      return;
-      break;
-
+  if (chksum != 0) {    /* checksum error */
+    cksumError(&msgSize, msg);
+    return;
   }
-
-  // TODO: error on unknown commands: STATUS_CMD_UNKNOWN
-
-  lcdWriteHex(msg[0]);  ///
-  // lcdWriteChr(' ');     ///
-  msgSize = 2;                    /* unknown command or bad message */
-  msg[1] = STATUS_CMD_FAILED;
-  statusReg = msg[1];
-  return;
+  else {
+    switch(msg[0]) {
+      case CMD_SIGN_ON:
+        signOn(&msgSize, msg);
+        break;
+      case CMD_SET_PARAMETER:
+        setParameter(&msgSize, msg);
+        break;
+      case CMD_GET_PARAMETER:
+        getParameter(&msgSize, msg);
+        break;
+      case CMD_OSCCAL:
+        osccal(&msgSize, msg);
+        break;
+      case CMD_LOAD_ADDRESS:
+        loadAddress(&msgSize, msg);
+        break;
+      case CMD_FIRMWARE_UPGRADE:
+        firmwareUpgrade(&msgSize, msg);
+        break;
+      case CMD_ENTER_PROGMODE_ISP:
+        enterProgModeIsp(&msgSize, msg);
+        break;
+      case CMD_LEAVE_PROGMODE_ISP:
+        leaveProgModeIsp(&msgSize, msg);
+        break;
+      case CMD_CHIP_ERASE_ISP:
+        chipEraseIsp(&msgSize, msg);
+        break;
+      case CMD_PROGRAM_FLASH_ISP:
+        programFlashIsp(&msgSize, msg);
+        break;
+      case CMD_READ_FLASH_ISP:
+        readFlashIsp(&msgSize, msg);
+        break;
+      case CMD_PROGRAM_EEPROM_ISP:
+        programEepromIsp(&msgSize, msg);
+        break;
+      case CMD_READ_EEPROM_ISP:
+        readEepromIsp(&msgSize, msg);
+        break;
+      case CMD_PROGRAM_FUSE_ISP:
+        programFuseIsp(&msgSize, msg);
+        break;
+      case CMD_READ_FUSE_ISP:
+        readFuseIsp(&msgSize, msg);
+        break;
+      case CMD_PROGRAM_LOCK_ISP:
+        programLockIsp(&msgSize, msg);
+        break;
+      case CMD_READ_LOCK_ISP:
+        readLockIsp(&msgSize, msg);
+        break;
+      case CMD_READ_SIGNATURE_ISP:
+        readSignatureIsp(&msgSize, msg);
+        break;
+      case CMD_READ_OSCCAL_ISP:
+        readOsccalIsp(&msgSize, msg);
+        break;
+      case CMD_SPI_MULTI:
+        ispMulti(&msgSize, msg);
+        break;
+      default:
+        msgSize = 2;                    /* unknown command or bad message */
+        msg[1] = STATUS_CMD_UNKNOWN;
+        statusReg = msg[1];
+        break;
+    }
+  }
 }

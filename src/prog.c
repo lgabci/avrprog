@@ -4,7 +4,7 @@
 #include "prog.h"
 #include "command.h"
 #include "spi.h"
-#include "lcd.h"   /////
+#include "led.h"
 
 #define BUILD_NUMBER_LOW    0
 #define BUILD_NUMBER_HIGH   1
@@ -41,26 +41,33 @@ static uint8_t controllerInit = 0; /* Controller init value = 0            */
 #define MEM_FLASH    0
 #define MEM_EEPROM   1
 
+static void setLeds() {
+  if (statusReg == STATUS_CMD_OK) {
+    ledOk();
+  }
+  else {
+    ledError();
+  }
+}
+
 /* send a 4 byte package on SPI bus
    - c: bytes to send
    - n: return this byte
-   - d: delay ms between bytes
    returns the nth byte                   */
-static uint8_t transmitPacket(uint8_t c[4], uint8_t n, uint8_t d) {
+static uint8_t transmitPacket(uint8_t c[4], uint8_t n) {
   uint8_t i;
   uint8_t v;
   uint8_t ret;
 
   ret = 0;
+  ledSetTx();
   for (i = 0; i < 4; i ++) {
     v = spiTransmit(c[i]);
-    if (d) {
-      delayMs(d);
-    }
     if (n == i) {
       ret = v;
     }
   }
+  ledClrTx();
 
   return ret;
 }
@@ -74,6 +81,8 @@ static void readMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {  /
 
   uint16_t i;
 
+  ledSetProcessing();
+
   if (*msgSize == 4) {
     if (memType == MEM_FLASH && address & 0x80000000UL) {
       // TODO: load extended address
@@ -85,7 +94,7 @@ static void readMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {  /
           (uint8_t)(address >> 8),
           (uint8_t)(address & 0xff),
           0
-        }, 3, 0);
+        }, 3);
 
       if (memType == MEM_EEPROM || HBIT(i)) {
         address ++;
@@ -101,6 +110,8 @@ static void readMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {  /
     statusReg = STATUS_CMD_FAILED;
   }
   *status1 = statusReg;
+
+  setLeds();
 }
 
 static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {  // TODO: memType enum
@@ -116,6 +127,8 @@ static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {
   uint16_t i;
   uint8_t rv;
   uint16_t oAddress;       /* original address */
+
+  ledSetProcessing();
 
   if (*msgSize >= 10 && *msgSize == numOfBytes + 10) {
     if (memType == MEM_FLASH && address & 0x80000000UL) {
@@ -136,7 +149,7 @@ static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {
           (uint8_t)(address >> 8),
           (uint8_t)(address & 0xff),
           data[i]
-        }, 0, 0);
+        }, 0);
 
       if (mode & MODEPAGE) {      /* page mode */
         if (i < numOfBytes - 1 || ! (mode & MODEPWTRPG)) {
@@ -150,7 +163,7 @@ static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {
             (uint8_t)(oAddress >> 8),
             (uint8_t)(oAddress & 0xff),
             0
-          }, 0, 0);
+          }, 0);
       }
 
       /* waiting for MCU to be ready after each word or page */
@@ -174,7 +187,7 @@ static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {
                 (uint8_t)(address >> 8),
                 (uint8_t)(address & 0xff),
                 0
-              }, 3, 0) == data[i]) {
+              }, 3) == data[i]) {
               break;
             }
           }
@@ -185,7 +198,7 @@ static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {
         // set timeout: delay
 
         while (1) {  // TODO: to func
-          if (! transmitPacket((uint8_t[4]){0x0f, 0, 0, 0}, 3, 0) & 1) {  /* poll RDY/BSY */   // TODO: make #define for 0x0f
+          if (! transmitPacket((uint8_t[4]){0x0f, 0, 0, 0}, 3) & 1) {  /* poll RDY/BSY */   // TODO: make #define for 0x0f
             break;
           }
 
@@ -206,6 +219,8 @@ static void programMemoryIsp(uint16_t *msgSize, uint8_t *msg, uint8_t memType) {
   }
 
   *status = statusReg;
+
+  setLeds();
 }
 
 void signOn(uint16_t *msgSize, uint8_t *msg) {
@@ -215,6 +230,8 @@ void signOn(uint16_t *msgSize, uint8_t *msg) {
   const uint8_t *stk = (uint8_t *)"STK500_2";
 
   uint8_t i;
+
+  ledSetProcessing();
 
   if (*msgSize == 1) {
     *msgSize = 11;
@@ -230,12 +247,16 @@ void signOn(uint16_t *msgSize, uint8_t *msg) {
   }
 
   *status = statusReg;
+
+  setLeds();
 }
 
 void setParameter(uint16_t *msgSize, uint8_t *msg) {
   uint8_t par = msg[1];
   uint8_t val = msg[2];
   uint8_t *status = &msg[1];
+
+  ledSetProcessing();
 
   if (*msgSize == 3) {
     switch (par) {
@@ -303,12 +324,16 @@ void setParameter(uint16_t *msgSize, uint8_t *msg) {
   }
 
   *status = statusReg;
+
+  setLeds();
 }
 
 void getParameter(uint16_t *msgSize, uint8_t *msg) {
   uint8_t par = msg[1];
   uint8_t *val = &msg[2];
   uint8_t *status = &msg[1];
+
+  ledSetProcessing();
 
   // TODO: STATUS_SET_PARAM_MISSING
 
@@ -387,27 +412,33 @@ void getParameter(uint16_t *msgSize, uint8_t *msg) {
   }
 
   *status = statusReg;
+
+  setLeds();
 }
 
 void osccal(uint16_t *msgSize, uint8_t *msg) {
   uint8_t *status = &msg[1];
 
-  if (*msgSize == 1) {
-    // TODO
+  ledSetProcessing();
 
-    *msgSize = 2;
-    statusReg = STATUS_CMD_OK;
+  if (*msgSize == 1) {
+    *msgSize = 2;      /* not implemented */
+    statusReg = STATUS_CMD_FAILED;
   }
   else {
     *msgSize = 2;
     statusReg = STATUS_CMD_FAILED;
   }
   *status = statusReg;
+
+  setLeds();
 }
 
 void loadAddress(uint16_t *msgSize, uint8_t *msg) {
   uint8_t *cmd = &msg[1];
   uint8_t *status = &msg[1];
+
+  ledSetProcessing();
 
   if (*msgSize == 5) {
     address = (uint32_t)cmd[0] << 24 | (uint32_t)cmd[1] << 16 |
@@ -421,10 +452,14 @@ void loadAddress(uint16_t *msgSize, uint8_t *msg) {
     statusReg = STATUS_CMD_FAILED;
   }
   *status = statusReg;
+
+  setLeds();
 }
 
 void firmwareUpgrade(uint16_t *msgSize, uint8_t *msg) {
   uint8_t *status = &msg[1];
+
+  ledSetProcessing();
 
   if (*msgSize == 11) {
     *msgSize = 2;
@@ -435,6 +470,8 @@ void firmwareUpgrade(uint16_t *msgSize, uint8_t *msg) {
     statusReg = STATUS_CMD_FAILED;  // TODO: maybe other error?
   }
   *status = statusReg;
+
+  setLeds();
 }
 
 void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
@@ -453,7 +490,7 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
   uint8_t j;
   uint8_t v;
 
-  // TODO: LEDs
+  ledSetProcessing();
 
   if (*msgSize == 12) {
     spiInit();           /* SPI SCK = 0, SPI MOSI = 0, RESET = 0 */
@@ -471,6 +508,7 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
 
       // wdt reset
 
+      ledSetTx();
       for (j = 0; j < 4; j ++) {
         v = spiTransmit(cmd[j]);
         delayMs(byteDelay);
@@ -479,6 +517,7 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
           ok = 1;
         }
       }
+      ledClrTx();
 
       if (ok) {
         break;
@@ -498,6 +537,8 @@ void enterProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
     statusReg = STATUS_CMD_FAILED;
   }
   *status = statusReg;
+
+  setLeds();
 }
 
 void leaveProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
@@ -505,7 +546,9 @@ void leaveProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
   uint8_t postDelay = msg[2];
   uint8_t *status = &msg[1];
 
-  // TODO: LEDs
+  uint8_t sr;  /* use local status, don't set statusReg */
+
+  ledSetProcessing();
 
   if (*msgSize == 3) {
     spiReset(RESET(1));
@@ -516,13 +559,15 @@ void leaveProgModeIsp(uint16_t *msgSize, uint8_t *msg) {
     delayMs(postDelay);
 
     *msgSize = 2;
-    statusReg = STATUS_CMD_OK;
+    sr = STATUS_CMD_OK;
   }
   else {
     *msgSize = 2;
-    statusReg = STATUS_CMD_FAILED;
+    sr = STATUS_CMD_FAILED;
   }
-  *status = statusReg;
+  *status = sr;
+
+  setLeds();
 }
 
 void chipEraseIsp(uint16_t *msgSize, uint8_t *msg) {
@@ -533,14 +578,16 @@ void chipEraseIsp(uint16_t *msgSize, uint8_t *msg) {
 
   uint8_t rv;
 
+  ledSetProcessing();
+
   if (*msgSize == 7) {
     rv = STATUS_CMD_OK;
-    transmitPacket(cmd, 0, 0);
+    transmitPacket(cmd, 0);
     if (pollMethod) {
       // set timeout: delay
 
       while (1) {   // to func
-        if (! transmitPacket((uint8_t[4]){0x0f, 0, 0, 0}, 3, 0) & 1) {  // TODO: make #define for 0x0f
+        if (! transmitPacket((uint8_t[4]){0x0f, 0, 0, 0}, 3) & 1) {  // TODO: make #define for 0x0f
           break;
         }
 
@@ -563,6 +610,8 @@ void chipEraseIsp(uint16_t *msgSize, uint8_t *msg) {
   }
 
   *status = statusReg;
+
+  setLeds();
 }
 
 void programFlashIsp(uint16_t *msgSize, uint8_t *msg) {
@@ -586,8 +635,10 @@ void programFuseIsp(uint16_t *msgSize, uint8_t *msg) {
   uint8_t *status2 = &msg[2];
   uint8_t *cmd = &msg[1];
 
+  ledSetProcessing();
+
   if (*msgSize == 5) {
-    transmitPacket(cmd, 0, 0);
+    transmitPacket(cmd, 0);
 
     *msgSize = 3;
     statusReg = STATUS_CMD_OK;
@@ -598,6 +649,8 @@ void programFuseIsp(uint16_t *msgSize, uint8_t *msg) {
     statusReg = STATUS_CMD_FAILED;
   }
   *status1 = statusReg;
+
+  setLeds();
 }
 
 void readFuseIsp(uint16_t *msgSize, uint8_t *msg) {
@@ -607,8 +660,10 @@ void readFuseIsp(uint16_t *msgSize, uint8_t *msg) {
   uint8_t *status1 = &msg[1];
   uint8_t *status2 = &msg[3];
 
+  ledSetProcessing();
+
   if (*msgSize == 6) {
-    *val = transmitPacket(cmd, retAddr - 1, 0);
+    *val = transmitPacket(cmd, retAddr - 1);
 
     *msgSize = 4;
     statusReg = STATUS_CMD_OK;
@@ -619,6 +674,8 @@ void readFuseIsp(uint16_t *msgSize, uint8_t *msg) {
     statusReg = STATUS_CMD_FAILED;
   }
   *status1 = statusReg;
+
+  setLeds();
 }
 
 void programLockIsp(uint16_t *msgSize, uint8_t *msg) {
@@ -647,6 +704,8 @@ void ispMulti(uint16_t *msgSize, uint8_t *msg) {
   uint8_t *data = &msg[2];
   uint8_t *status2 = &msg[numRx + 2];
 
+  ledSetProcessing();
+
 
   // TODO: wdt reset?
 
@@ -654,6 +713,7 @@ void ispMulti(uint16_t *msgSize, uint8_t *msg) {
     uint8_t v;
 
     *msgSize = numRx + 3;
+    ledSetTx();
     while (numTx || numRx) {
       if (numTx) {
         v = spiTransmit(*(txData ++));
@@ -673,6 +733,7 @@ void ispMulti(uint16_t *msgSize, uint8_t *msg) {
         rxStartAddr --;
       }
     }
+    ledClrTx();
 
     statusReg = STATUS_CMD_OK;
     *status2 = statusReg;
@@ -682,6 +743,20 @@ void ispMulti(uint16_t *msgSize, uint8_t *msg) {
     statusReg = STATUS_CMD_FAILED;
   }
   *status1 = statusReg;
+
+  setLeds();
 }
 
-void cksumError(uint16_t *msgSize, uint8_t *msg);  //
+void cksumError(uint16_t *msgSize, uint8_t *msg) {
+  uint8_t *cmd = &msg[0];
+  uint8_t *status = &msg[1];
+
+  ledSetProcessing();
+
+  *msgSize = 2;
+  *cmd = ANSWER_CKSUM_ERROR;
+  statusReg = ANSWER_CKSUM_ERROR;
+  *status = statusReg;
+
+  setLeds();
+}
