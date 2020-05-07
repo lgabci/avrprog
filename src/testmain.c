@@ -17,6 +17,6 @@ int main() {
 
   while (1) {
     PORTB ^= 1;
-    _delay_ms(250);
+    _delay_ms(500);
   }
 }

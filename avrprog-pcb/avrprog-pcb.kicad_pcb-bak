@@ -1075,7 +1075,7 @@
   )
 
   (module Connector_PinHeader_2.54mm:PinHeader_2x05_P2.54mm_Vertical (layer F.Cu) (tedit 59FED5CC) (tstamp 5F1397E8)
-    (at 102.87 87.63 180)
+    (at 99.06 96.52 180)
     (descr "Through hole straight pin header, 2x05, 2.54mm pitch, double rows")
     (tags "Through hole pin header THT 2x05 2.54mm double row")
     (path /5EB4E86C)
