@@ -997,17 +997,17 @@ Wire Wire Line
 Connection ~ 10500 3450
 Text GLabel 9400 3450 0    50   Input ~ 0
 PRG_MOSI
-Text GLabel 8200 3950 2    50   Input ~ 0
+Text GLabel 8200 3650 2    50   Input ~ 0
 PRG_MOSI
-Text GLabel 8200 3850 2    50   Input ~ 0
+Text GLabel 8200 3750 2    50   Input ~ 0
 PRG_RESET
 Text GLabel 9400 3650 0    50   Input ~ 0
 PRG_RESET
-Text GLabel 8200 3750 2    50   Input ~ 0
+Text GLabel 8200 3850 2    50   Input ~ 0
 PRG_SCK
 Text GLabel 9400 3750 0    50   Input ~ 0
 PRG_SCK
-Text GLabel 8200 3650 2    50   Input ~ 0
+Text GLabel 8200 3950 2    50   Input ~ 0
 PRG_MISO
 Text GLabel 9400 3850 0    50   Input ~ 0
 PRG_MISO
