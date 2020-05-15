@@ -1,0 +1,19 @@
+[binaries]
+c = 'avr-gcc'
+ld = 'avr-ld'
+ar = 'avr-ar'
+as = 'avr-as'
+size = 'avr-size'
+objdump = 'avr-objdump'
+objcopy = 'avr-objcopy'
+strip = 'avr-strip'
+
+[properties]
+c_args = ['-mmcu=atmega8a', '-O2', '-pedantic', '-Wall', '-Werror', '-c']
+c_link_args = ['-mmcu=atmega8a']
+
+[host_machine]
+system = 'baremetal'
+cpu_family = 'avr'
+cpu = 'atmega8a'
+endian = 'none'
