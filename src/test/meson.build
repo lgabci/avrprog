@@ -13,7 +13,11 @@ testavrprog_hex = custom_target('testavrprog.bin',
   build_by_default: false
 )
 
-USBDEV = '/dev/ttyUSB0'
-#TESTADVERFLAGS = -p m8 -B 1MHz -c stk500v2 -P $(USBDEV) -v -U flash:v:$<:i
-#TESTADWRTFLAGS = -p m8 -B 1MHz -c stk500v2 -P $(USBDEV) -v -U flash:w:$<:i
+# flash test uC
+testflash = custom_target('testflash',
+  output: 'testflash',
+  input: testavrprog_hex,
+  command: [flash_sh, '@INPUT@', 'v', 'stk500v2', '1MHz'],
+  build_by_default: false
+)
 

@@ -32,6 +32,6 @@ avrprog_hex = custom_target('avrprog.bin',
 flash = custom_target('flash',
   output: 'flash',
   input: avrprog_hex,
-  command: [flash_sh, '@INPUT@'],
+  command: [flash_sh, '@INPUT@', 'w', 'ft'],
   build_by_default: true
 )

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-if [ $# -le 3 ] || [ $# -gt 4 ]; then
+if [ $# -lt 3 ] || [ $# -gt 4 ]; then
   echo "$(basename $0) filename operator target [speed]" >&2
   echo "  filename: file to flash into uC" >&2
   echo "  operator, v = verify, w = write" >&2
@@ -34,6 +34,10 @@ case "$3" in
   stk500*)
     PRGID=stk500v2
     PORT=/dev/ttyUSB0
+    if [ ! -e "$PORT" ] && lsusb -d 0403:6001 >/dev/null; then
+      sudo rmmod ftdi_sio || true
+      sudo modprobe ftdi_sio
+    fi
     ;;
   *)
     echo "Invalid target: $3" >&2
@@ -52,4 +56,3 @@ if [ "$OP" = w ]; then
   fi
 fi
 avrdude -p m8 $SPD -c "$PRGID" -P "$PORT" -U flash:"$OP":"$FILE":i
-
