@@ -649,7 +649,7 @@
       (effects (font (size 1 1) (thickness 0.15)))
       (tstamp eb72c3cb-ecb4-436e-8096-4679de4f5015)
     )
-    (fp_text value "16MHz" (at 2.44 3.525 90) (layer "F.Fab")
+    (fp_text value "14.7456MHz" (at 2.44 3.525 90) (layer "F.Fab")
       (effects (font (size 1 1) (thickness 0.15)))
       (tstamp 11109580-d7a9-4eb4-8250-b6929d61632d)
     )
